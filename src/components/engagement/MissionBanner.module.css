@@ -1,0 +1,31 @@
+.bar,
+.done {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 10px 14px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.done {
+  background: var(--accent-soft);
+}
+
+.bar strong,
+.done strong {
+  color: var(--accent-strong);
+}
+
+.bar em,
+.done em {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.done em {
+  color: var(--accent-strong);
+}
