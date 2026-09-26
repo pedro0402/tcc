@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// SQLite for local MVP; switch provider to "postgresql" + DATABASE_URL for production.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String              @id @default(uuid())
+  email        String              @unique
+  passwordHash String
+  createdAt    DateTime            @default(now())
+  progress     OperationProgress[]
+  quizAttempts QuizAttempt[]
+}
+
+model OperationProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  structure   String
+  operation   String
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model QuizAttempt {
+  id         String   @id @default(uuid())
+  userId     String
+  questionId String
+  isCorrect  Boolean
+  answeredAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
