@@ -1,0 +1,100 @@
+.page {
+  display: grid;
+  gap: 28px;
+}
+
+.intro h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.4vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.intro p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  max-width: 62ch;
+  line-height: 1.6;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.lesson,
+.lessonAmber {
+  border: 1px solid var(--line);
+  padding: 22px;
+  background: var(--panel);
+  border-radius: var(--radius);
+}
+
+.lesson h2,
+.lessonAmber h2 {
+  margin: 8px 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lesson ul,
+.lessonAmber ul {
+  color: var(--muted);
+  padding-left: 1.1em;
+}
+
+.lesson a,
+.lessonAmber a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tag,
+.tagAmber {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.tagAmber {
+  color: var(--amber);
+}
+
+.tipGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.tipGrid article {
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: var(--panel);
+  border-radius: var(--radius);
+}
+
+.tipGrid h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.tipGrid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}

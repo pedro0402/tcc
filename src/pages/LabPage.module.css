@@ -1,0 +1,258 @@
+.studio {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.modes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-elevated);
+  color: var(--muted);
+}
+
+.mode,
+.modeOn {
+  background: transparent;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+}
+
+.modeOn {
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  border-color: var(--line);
+  font-weight: 700;
+}
+
+.meta {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.lectureBtn,
+.lectureBtnOn {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.74rem;
+  padding: 6px 10px;
+  margin-left: 10px;
+}
+
+.lectureBtnOn {
+  background: var(--accent-soft);
+  border-color: var(--line);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px 1fr 360px;
+  position: relative;
+}
+
+.ops {
+  width: 240px;
+  background: var(--panel-strong);
+  color: var(--ink);
+  padding: 14px 0 16px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  box-shadow: inset -1px 0 0 rgba(28, 33, 31, 0.03);
+}
+
+.opsTitle {
+  margin: 0 12px 10px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.op,
+.opOn {
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 0.94rem;
+  display: grid;
+  gap: 2px;
+  border-left: 2px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.op small,
+.opOn small {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.op:hover {
+  background: rgba(31, 93, 77, 0.04);
+}
+
+.opOn {
+  font-weight: 700;
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+
+.val {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 12px 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.val input {
+  width: 64px;
+  border: 1px solid var(--line-strong);
+  padding: 5px 6px;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 8px;
+}
+
+.valHint {
+  margin: 12px 12px 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.lectureSide {
+  padding: 14px 14px 8px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.lectureSide h2 {
+  margin: 6px 0 8px;
+  font-size: 1.1rem;
+}
+
+.badge {
+  margin: 0;
+  color: var(--amber);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.opToggle {
+  position: absolute;
+  left: 0;
+  top: 42%;
+  z-index: 3;
+  width: 18px;
+  height: 72px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.studio:has(.ops) .opToggle {
+  left: 240px;
+}
+
+.canvas {
+  position: relative;
+  min-width: 0;
+  background: var(--bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.lecture {
+  display: none;
+}
+
+.overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(480px, 92%);
+  z-index: 5;
+}
+
+.toast {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.trace {
+  width: 360px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+}
+
+.trace header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.trace header button,
+.traceToggle {
+  background: transparent;
+  color: var(--ink);
+}
+
+.traceToggle {
+  width: 28px;
+  writing-mode: vertical-rl;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+
+@media (max-width: 860px) {
+  .stage {
+    grid-template-columns: 1fr;
+  }
+
+  .ops,
+  .trace {
+    width: 100%;
+  }
+}
