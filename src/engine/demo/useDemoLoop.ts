@@ -13,17 +13,20 @@ export function useDemoLoop(script: DemoScript) {
   const [index, setIndex] = useState(() =>
     prefersReducedMotion() ? Math.max(0, script.frames.length - 1) : 0,
   );
+  const reducedMotion = prefersReducedMotion();
+  const lastIndex = Math.max(0, script.frames.length - 1);
+  const clampedIndex = reducedMotion ? lastIndex : Math.min(index, lastIndex);
 
   useEffect(() => {
-    setIndex(prefersReducedMotion() ? Math.max(0, script.frames.length - 1) : 0);
-  }, [script]);
+    setIndex(reducedMotion ? lastIndex : 0);
+  }, [script, reducedMotion, lastIndex]);
 
   useEffect(() => {
-    if (script.frames.length < 2 || prefersReducedMotion()) return;
+    if (script.frames.length < 2 || reducedMotion) return;
 
     let timeout: number | undefined;
     const arm = () => {
-      const ms = script.frames[index].holdMs ?? script.holdMs;
+      const ms = script.frames[clampedIndex].holdMs ?? script.holdMs;
       timeout = window.setTimeout(() => {
         if (document.hidden) return;
         setIndex((i) => (i + 1) % script.frames.length);
@@ -41,8 +44,8 @@ export function useDemoLoop(script: DemoScript) {
       window.clearTimeout(timeout);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [script, index]);
+  }, [script, clampedIndex, reducedMotion]);
 
-  const frame = script.frames[index];
-  return { frame, index, line: frame?.line ?? -1, code: script.code, kind: script.kind };
+  const frame = script.frames[clampedIndex];
+  return { frame, index: clampedIndex, line: frame?.line ?? -1, code: script.code, kind: script.kind };
 }
