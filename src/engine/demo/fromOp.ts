@@ -24,7 +24,7 @@ export function scriptFromOp(
     const nodes = step.nodes.map((n) => ({ id: nodeId(n.id), value: n.value }));
     const order = nodes.map((n) => n.id);
     const current = new Set(order);
-    const incomingIds = order.filter((id) => !prev.has(id));
+    const incomingIds = i === 0 ? [] : order.filter((id) => !prev.has(id));
 
     let connecting: DemoFrame["connecting"];
     if (incomingIds.length === 1) {
