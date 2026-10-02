@@ -40,7 +40,7 @@ export function HomePage() {
               </svg>
               Começar a aprender
             </a>
-            <span className={styles.actionNote}>Gratuito e direto no navegador</span>
+            {/* <span className={styles.actionNote}>Gratuito e direto no navegador</span> */}
           </div>
         </div>
 
