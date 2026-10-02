@@ -1,3 +1,4 @@
+import { LivePreview } from "../components/home/LivePreview";
 import { hrefFor } from "../routing/useHashRoute";
 import styles from "./HomePage.module.css";
 
@@ -84,31 +85,7 @@ export function HomePage() {
 function PreviewCard() {
   return (
     <a className={styles.preview} href={`${hrefFor("lab")}?s=list`} aria-label="Abrir o simulador da lista encadeada">
-      <header className={styles.previewHead}>
-        <div>
-          <p className={styles.previewKicker}>Visualização ao vivo</p>
-          <p className={styles.previewOp}>Inserir no fim</p>
-        </div>
-        <span className={styles.previewDot} aria-hidden="true" />
-      </header>
-
-      <div className={styles.previewStage} aria-hidden="true">
-        <span className={styles.previewPtr}>cabeça</span>
-        <div className={styles.previewRow}>
-          <span className={styles.previewNode}>3</span>
-          <span className={styles.previewArrow}>→</span>
-          <span className={styles.previewNode}>8</span>
-          <span className={styles.previewArrow}>→</span>
-          <span className={`${styles.previewNode} ${styles.previewNodeActive}`}>15</span>
-          <span className={styles.previewNull}>null</span>
-        </div>
-      </div>
-
-      <pre className={styles.previewCode} aria-hidden="true">
-        <span className={styles.codeDim}>novo.proximo = null;</span>
-        <span className={styles.codeOn}>atual.proximo = novo;</span>
-        <span className={styles.codeDim}>return cabeca;</span>
-      </pre>
+      <LivePreview />
     </a>
   );
 }
