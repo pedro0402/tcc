@@ -56,6 +56,11 @@ function applyList(kind: ListKind, nodes: Node[], spec: OpSpec): E.Op {
   }
 }
 
+/** Constrói a Op (com passos de visualização) de uma única operação. */
+export function opFromSpec(structure: Structure, variant: ListKind, nodes: Node[], spec: OpSpec): E.Op {
+  return structure === "stack" ? applyStack(nodes, spec) : applyList(variant, nodes, spec);
+}
+
 /**
  * Aplica as operações em ordem. Reaproveita os construtores do motor: cada um
  * devolve o estado final (op.final) e marca erro no último passo quando falha.

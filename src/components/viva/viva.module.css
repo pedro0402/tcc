@@ -870,8 +870,44 @@
   background: color-mix(in oklch, var(--ev-success) 12%, var(--ev-card));
 }
 
+.challengeFail {
+  margin: 0 16px 8px;
+  padding: 12px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-destructive);
+  background: color-mix(in oklch, var(--ev-destructive) 12%, var(--ev-card));
+  line-height: 1.5;
+}
+
 .challengeNext {
   margin-left: 10px;
+}
+
+.desafioHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.desafioMeters {
+  display: flex;
+  gap: 14px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--ev-muted-fg);
+}
+
+.sideQuiet {
+  padding: 16px;
+}
+
+.sideQuietText {
+  margin: 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 /* ---------- Canvas ---------- */

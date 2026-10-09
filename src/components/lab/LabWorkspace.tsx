@@ -4,7 +4,8 @@ import type { Node, Op, Step, Structure } from "../../engine/viva/engine";
 import type { OpId } from "../../engine/viva/opIds";
 import { listOps } from "../../engine/viva/lists";
 import { chain } from "../../engine/viva/links";
-import { nodesFromValues, nodesToText, parseInitialState } from "../../engine/viva/initialState";
+import { opFromSpec, type OpSpec } from "../../engine/viva/runOps";
+import { nodesFromValues } from "../../engine/viva/initialState";
 import { selfExplainFor } from "../../content/selfExplain";
 import { recordSelfExplanation } from "../../persistence/localProgress";
 import {
@@ -16,9 +17,25 @@ import {
   STAGE_HINT,
   STAGE_LABEL,
   type ScaffoldState,
+  type Stage,
 } from "../../engine/viva/scaffold";
-import { makeChallenge, matchesTarget, type Challenge } from "../../engine/viva/challenge";
-import { hasWorkedExample, keyStepsFor } from "../../content/workedExamples";
+import { matchesTarget } from "../../engine/viva/challenge";
+import {
+  afterStep,
+  formatSeconds,
+  startDesafio,
+  stepsLeft,
+  tick,
+  type DesafioState,
+} from "../../engine/viva/desafioState";
+import {
+  desafioSpec,
+  fazerGoal,
+  observeScript,
+  previewOps,
+  type Goal,
+} from "../../content/scaffoldScripts";
+import { keyStepsFor } from "../../content/workedExamples";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, DoBox, ExampleBox, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
@@ -42,7 +59,6 @@ export function idleStepFor(structure: Structure, nodes: Node[], kind?: ListKind
     highlight: [],
     message: "Escolha uma operação para começar.",
     vars: {},
-    // Lista dupla/circular: mostra as ligações reais (null nas pontas, retorno à cabeça).
     links: structure === "linkedList" && kind && kind !== "simples" ? chain(n, kind) : undefined,
   };
 }
@@ -57,29 +73,19 @@ export const idleOp = (structure: Structure, nodes: Node[], kind?: ListKind): Op
 
 export interface LabWorkspaceProps {
   structure: Structure;
-  /** Variante da lista (só desenho por enquanto). */
   kind?: ListKind;
-  /** Se informado, mostra o seletor de tipo de lista. */
   onKindChange?: (kind: ListKind) => void;
-  /** Estado atual da estrutura (controlado por quem usa o componente). */
   nodes: Node[];
   onNodesChange: (nodes: Node[], structure: Structure) => void;
-  /** Operações liberadas. Sem este campo, todas aparecem. */
-  allowed?: OpId[];
-  /** Mostra o botão "Esvaziar estrutura". Padrão: sim. */
-  allowClear?: boolean;
-  /** Oferece a autoexplicação ao fim de cada operação. Padrão: sim. */
-  selfExplain?: boolean;
-  /** Chamado quando uma operação (exceto a ociosa) chega ao fim. */
   onOpDone?: (op: Op) => void;
   onPredict?: (event: PredictEvent) => void;
-  /** Avisa quando há operação em andamento (para travar troca de aba etc.). */
   onBusyChange?: (busy: boolean) => void;
 }
 
 /**
- * Simulador completo (operações, visualização, previsão, controles e código).
- * É a peça reutilizada pelo Laboratório e pelas atividades de prática.
+ * Simulador com a escada de scaffolding (Observar, Prever, Fazer, Desafio).
+ * Cada estágio reconfigura o que o aluno vê e faz; ver os blocos por estágio
+ * mais abaixo.
  */
 export function LabWorkspace({
   structure,
@@ -87,9 +93,6 @@ export function LabWorkspace({
   onKindChange,
   nodes,
   onNodesChange,
-  allowed,
-  allowClear = true,
-  selfExplain = true,
   onOpDone,
   onPredict,
   onBusyChange,
@@ -97,11 +100,8 @@ export function LabWorkspace({
   const isList = structure === "linkedList";
   const [val, setVal] = useState("42");
   const [pos, setPos] = useState("1");
-  // Nível de detalhe: "essencial" esconde o painel de variáveis para reduzir a
-  // carga cognitiva (TCAM/Sweller); "completo" mostra tudo.
   const [detail, setDetail] = useState<"essencial" | "completo">("completo");
 
-  // Callbacks por ref: o player recebe funções estáveis mesmo se o pai recriar as suas.
   const nodesChangeRef = useRef(onNodesChange);
   const opDoneRef = useRef(onOpDone);
   const predictRef = useRef(onPredict);
@@ -109,28 +109,85 @@ export function LabWorkspace({
   opDoneRef.current = onOpDone;
   predictRef.current = onPredict;
 
-  // Escada de scaffolding: apoio decrescente de Observar a Desafio.
   const [scaffold, setScaffold] = useState<ScaffoldState>(initialScaffold);
-  const scaffoldRef = useRef(scaffold);
-  scaffoldRef.current = scaffold;
-  // Desafio gerado para o estágio "desafio" (meta a alcançar).
-  const [challenge, setChallenge] = useState<Challenge | null>(null);
-  const [challengeDone, setChallengeDone] = useState(false);
-  const challengeSeed = useRef(1);
+  const stage = scaffold.stage;
+  const stageRef = useRef(stage);
+  stageRef.current = stage;
 
-  // Operação recém-concluída (sem erro), para oferecer a autoexplicação.
+  // Fila de operações do roteiro automático (Observar e Prever).
+  const scriptQueue = useRef<OpSpec[]>([]);
+  // Estado em que o Observar terminou, herdado pelo Prever.
+  const observeResult = useRef<number[] | null>(null);
+
+  // Estado do estágio Fazer e Desafio.
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [goalDone, setGoalDone] = useState(false);
+  const [desafio, setDesafio] = useState<DesafioState | null>(null);
+
   const [explained, setExplained] = useState<Op | null>(null);
+
+  // Dispara a próxima operação do roteiro sobre `base` (o estado real atual),
+  // evitando closures de `nodes` desatualizadas entre operações encadeadas.
+  const runNextScripted = useCallback((base: Node[]) => {
+    const q = scriptQueue.current;
+    if (q.length === 0) return false;
+    const spec = q.shift()!;
+    const op = opFromSpec(structure, kind, base, spec);
+    if (stageRef.current === "observar") {
+      const stops: Record<number, string> = {};
+      for (const k of keyStepsFor(op)) stops[k.stepIndex] = k.text;
+      p.start(op, { exampleStops: stops });
+    } else {
+      p.start(op);
+    }
+    return true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structure, kind]);
 
   const handleDone = useCallback((op: Op) => {
     nodesChangeRef.current(op.final, op.structure);
     if (op.name === IDLE) return;
     opDoneRef.current?.(op);
+    const st = stageRef.current;
+
+    // Roteiro automático (Observar/Prever): encadeia a próxima operação a partir
+    // do estado real que acabou de ser produzido (op.final).
+    if (st === "observar" || st === "prever") {
+      // Guarda o estado final já: se for o último, o Prever herda daqui.
+      if (st === "observar") observeResult.current = op.final.map((n) => n.value);
+      if (scriptQueue.current.length > 0) {
+        const base = op.final;
+        setTimeout(() => runNextScripted(base), 600);
+      }
+      return;
+    }
+
+    // Fazer: verifica a meta.
+    if (st === "fazer" && goal) {
+      const reached = matchesTarget(goal.target, op.final.map((n) => n.value));
+      if (reached) {
+        setGoalDone(true);
+        setScaffold((s) => applyAttempt(s, { correct: true }));
+      }
+    }
+
+    // Desafio: conta o passo e reavalia tempo/meta.
+    if (st === "desafio") {
+      setDesafio((d) => {
+        if (!d || d.status !== "running") return d;
+        const next = afterStep(d, op.final.map((n) => n.value));
+        if (next.status === "won") setScaffold((s) => applyAttempt(s, { correct: true }));
+        return next;
+      });
+    }
+
+    // Autoexplicação só nos estágios de prática.
     const hadError = op.steps.some((s) => s.error);
-    setExplained(selfExplain && !hadError && selfExplainFor(op.name) ? op : null);
-  }, [selfExplain]);
+    setExplained((st === "fazer" || st === "desafio") && !hadError && selfExplainFor(op.name) ? op : null);
+  }, [goal, runNextScripted]);
+
   const handlePredict = useCallback((e: PredictEvent) => {
     predictRef.current?.(e);
-    // Cada previsão respondida alimenta a escada (acerto limpo sobe; erro desce).
     setScaffold((s) => applyAttempt(s, { correct: e.correct }));
   }, []);
   const handleDo = useCallback((e: { correct: boolean }) => {
@@ -138,64 +195,77 @@ export function LabWorkspace({
   }, []);
   const p = usePlayer({ onDone: handleDone, onPredict: handlePredict, onDo: handleDo });
 
-  // O estágio define o apoio: Observar sem perguntas; Prever com previsão;
-  // Fazer com perguntas de ponteiro (clicar no nó); Desafio sem passos guiados.
-  const stage = scaffold.stage;
-  useEffect(() => {
-    p.setPredictMode(stage === "prever");
-    p.setDoMode(stage === "fazer");
-    // No Observar, a operação vira um exemplo resolvido: pausa nos passos-chave.
-    p.setExampleMode(stage === "observar");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
-
   useEffect(() => {
     onBusyChange?.(p.busy);
   }, [p.busy, onBusyChange]);
 
-  // Ao trocar de estrutura, volta ao estado ocioso da nova estrutura.
-  const lastStructure = useRef(structure);
-  useEffect(() => {
-    if (lastStructure.current === structure) return;
-    lastStructure.current = structure;
-    p.start(idleOp(structure, nodes, kind));
+  // Configura cada estágio ao entrar nele (ou ao trocar de estrutura/tipo).
+  // Observar e Prever montam estados fixos e rodam roteiros; Fazer e Desafio
+  // começam vazios com uma meta.
+  const setupStage = useCallback((st: Stage) => {
+    setExplained(null);
+    setGoalDone(false);
+    scriptQueue.current = [];
+    p.setPredictMode(st === "prever");
+    p.setDoMode(st === "fazer");
+    p.setExampleMode(st === "observar");
+
+    if (st === "observar") {
+      const script = observeScript(structure);
+      scriptQueue.current = script.steps.map((s) => s.spec);
+      setGoal(null);
+      setDesafio(null);
+      const initialNodes = nodesFromValues(script.initial);
+      onNodesChange(initialNodes, structure);
+      p.start(idleOp(structure, initialNodes, kind));
+      // começa o roteiro após montar o estado inicial
+      setTimeout(() => runNextScripted(initialNodes), 700);
+      return;
+    }
+    if (st === "prever") {
+      const base = observeResult.current ?? observeScript(structure).initial;
+      const baseNodes = nodesFromValues(base);
+      scriptQueue.current = [...previewOps(structure)];
+      setGoal(null);
+      setDesafio(null);
+      onNodesChange(baseNodes, structure);
+      p.start(idleOp(structure, baseNodes, kind));
+      setTimeout(() => runNextScripted(baseNodes), 700);
+      return;
+    }
+    if (st === "fazer") {
+      const g = fazerGoal(structure);
+      setGoal(g);
+      setDesafio(null);
+      onNodesChange([], structure);
+      p.start(idleOp(structure, [], kind));
+      return;
+    }
+    // desafio
+    const d = desafioSpec(structure);
+    setGoal(d);
+    setDesafio(startDesafio(d.target, d.maxSteps, d.seconds));
+    onNodesChange([], structure);
+    p.start(idleOp(structure, [], kind));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [structure]);
+  }, [structure, kind]);
 
-  // Ao trocar o tipo da lista (simples/dupla/circular), limpa a visualização
-  // da operação anterior, que pertence a outro tipo.
-  const lastKind = useRef(kind);
+  // Reconfigura ao trocar de estágio, de estrutura ou de tipo de lista.
   useEffect(() => {
-    if (lastKind.current === kind) return;
-    lastKind.current = kind;
-    if (!p.busy) p.start(idleOp(structure, nodes, kind));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]);
-
-  // Ao entrar no Desafio, gera uma meta a partir do estado atual.
-  const newChallenge = useCallback(() => {
-    const c = makeChallenge(structure, kind, nodes.map((n) => n.value), challengeSeed.current++);
-    setChallenge(c);
-    setChallengeDone(false);
-  }, [structure, kind, nodes]);
-
-  useEffect(() => {
-    if (stage === "desafio") newChallenge();
-    else setChallenge(null);
+    setupStage(stage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, structure, kind]);
 
-  // Verifica a meta do desafio sempre que o estado muda (fora de execução).
+  // Relógio regressivo do Desafio.
   useEffect(() => {
-    if (stage !== "desafio" || !challenge || challengeDone || p.busy) return;
-    if (matchesTarget(challenge.target, nodes.map((n) => n.value))) {
-      setChallengeDone(true);
-      setScaffold((s) => applyAttempt(s, { correct: true }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, stage, challenge, challengeDone, p.busy]);
+    if (stage !== "desafio" || !desafio || desafio.status !== "running") return;
+    const t = window.setInterval(() => setDesafio((d) => (d ? tick(d) : d)), 1000);
+    return () => window.clearInterval(t);
+  }, [stage, desafio]);
 
   const L = listOps(kind);
+  // No Fazer e no Desafio, só as operações da meta ficam liberadas.
+  const allowed = goal?.allowed;
   const can = (id: OpId) => !allowed || allowed.includes(id);
   const any = (...ids: OpId[]) => ids.some(can);
 
@@ -204,108 +274,114 @@ export function LabWorkspace({
   const valid = !Number.isNaN(v());
   const posValid = !Number.isNaN(ps());
 
+  // Painel de operações só aparece quando o aluno opera (Fazer e Desafio).
+  const canOperate = stage === "fazer" || stage === "desafio";
+  // No Desafio travado (venceu ou falhou), bloqueia novas operações.
+  const desafioLocked = stage === "desafio" && desafio?.status !== "running";
+  const opsDisabled = p.busy || desafioLocked;
+
   const idleStep = idleStepFor(structure, nodes, kind);
   const step = p.op ? p.step : idleStep;
 
   const run = (op: Op) => {
-    if (p.busy) return;
+    if (opsDisabled) return;
     setExplained(null);
-    // No estágio Observar, roda como exemplo resolvido: pausa comentada nos passos-chave.
-    if (stage === "observar" && hasWorkedExample(op)) {
-      const stops: Record<number, string> = {};
-      for (const k of keyStepsFor(op)) stops[k.stepIndex] = k.text;
-      p.start(op, { exampleStops: stops });
-      return;
-    }
     p.start(op);
   };
 
+  // Botão contextual embaixo do painel.
+  const resetDesafio = () => {
+    const d = desafioSpec(structure);
+    setGoalDone(false);
+    setDesafio(startDesafio(d.target, d.maxSteps, d.seconds));
+    setExplained(null);
+    onNodesChange([], structure);
+    p.start(idleOp(structure, [], kind));
+  };
   const clear = () => {
     setExplained(null);
     onNodesChange([], structure);
     p.start(idleOp(structure, [], kind));
   };
 
-  // Define o estado inicial da estrutura a partir de uma lista de valores.
-  const applyInitial = (values: number[]) => {
-    setExplained(null);
-    const next = nodesFromValues(values);
-    onNodesChange(next, structure);
-    p.start(idleOp(structure, next, kind));
-  };
-
   return (
     <div className={styles.grid}>
-      <aside className={styles.side} aria-label="Operações">
-        <div className={styles.fields}>
-          <label className={styles.fieldLabel}>
-            Valor
-            <Input value={val} onChange={(e) => setVal(e.target.value)} type="number" aria-invalid={!valid} />
-          </label>
-          {isList && any("insertAt", "removeAt") && (
+      {canOperate ? (
+        <aside className={styles.side} aria-label="Operações">
+          <div className={styles.fields}>
             <label className={styles.fieldLabel}>
-              Posição
-              <Input value={pos} onChange={(e) => setPos(e.target.value)} type="number" min={0} aria-invalid={!posValid} />
+              Valor
+              <Input value={val} onChange={(e) => setVal(e.target.value)} type="number" aria-invalid={!valid} />
             </label>
-          )}
-        </div>
+            {isList && any("insertAt", "removeAt") && (
+              <label className={styles.fieldLabel}>
+                Posição
+                <Input value={pos} onChange={(e) => setPos(e.target.value)} type="number" min={0} aria-invalid={!posValid} />
+              </label>
+            )}
+          </div>
 
-        {isList ? (
-          <>
-            {onKindChange && (
-              <div>
-                <div className={styles.groupTitle}>Tipo</div>
-                <div className={styles.kindRow}>
-                  {(["simples", "dupla", "circular"] as ListKind[]).map((k) => (
-                    <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} disabled={p.busy} onClick={() => onKindChange(k)} aria-pressed={kind === k}>
-                      {k}
-                    </Button>
-                  ))}
+          {isList ? (
+            <>
+              {onKindChange && (
+                <div>
+                  <div className={styles.groupTitle}>Tipo</div>
+                  <div className={styles.kindRow}>
+                    {(["simples", "dupla", "circular"] as ListKind[]).map((k) => (
+                      <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} disabled={opsDisabled} onClick={() => onKindChange(k)} aria-pressed={kind === k}>
+                        {k}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {any("insertHead", "insertTail", "insertAt") && (
-              <Group title="Inserir">
-                {can("insertHead") && <Button disabled={!valid || p.busy} onClick={() => run(L.insertHead(nodes, v()))}>No início</Button>}
-                {can("insertTail") && <Button disabled={!valid || p.busy} onClick={() => run(L.insertTail(nodes, v()))}>No fim</Button>}
-                {can("insertAt") && <Button disabled={!valid || !posValid || p.busy} onClick={() => run(L.insertAt(nodes, ps(), v()))}>Na posição</Button>}
-              </Group>
-            )}
-            {any("removeAt", "removeValue") && (
-              <Group title="Remover">
-                {can("removeAt") && <Button variant="outline" disabled={!posValid || p.busy} onClick={() => run(L.removeAt(nodes, ps()))}>Da posição</Button>}
-                {can("removeValue") && <Button variant="outline" disabled={!valid || p.busy} onClick={() => run(L.removeValue(nodes, v()))}>Por valor</Button>}
-              </Group>
-            )}
-            {can("search") && (
-              <Group title="Percorrer">
-                <Button variant="secondary" disabled={!valid || p.busy} onClick={() => run(L.search(nodes, v()))}>Buscar valor</Button>
-              </Group>
-            )}
-          </>
-        ) : (
-          <>
+              )}
+              {any("insertHead", "insertTail", "insertAt") && (
+                <Group title="Inserir">
+                  {can("insertHead") && <Button disabled={!valid || opsDisabled} onClick={() => run(L.insertHead(nodes, v()))}>No início</Button>}
+                  {can("insertTail") && <Button disabled={!valid || opsDisabled} onClick={() => run(L.insertTail(nodes, v()))}>No fim</Button>}
+                  {can("insertAt") && <Button disabled={!valid || !posValid || opsDisabled} onClick={() => run(L.insertAt(nodes, ps(), v()))}>Na posição</Button>}
+                </Group>
+              )}
+              {any("removeAt", "removeValue") && (
+                <Group title="Remover">
+                  {can("removeAt") && <Button variant="outline" disabled={!posValid || opsDisabled} onClick={() => run(L.removeAt(nodes, ps()))}>Da posição</Button>}
+                  {can("removeValue") && <Button variant="outline" disabled={!valid || opsDisabled} onClick={() => run(L.removeValue(nodes, v()))}>Por valor</Button>}
+                </Group>
+              )}
+              {can("search") && (
+                <Group title="Percorrer">
+                  <Button variant="secondary" disabled={!valid || opsDisabled} onClick={() => run(L.search(nodes, v()))}>Buscar valor</Button>
+                </Group>
+              )}
+            </>
+          ) : (
             <Group title="Operações">
-              {can("push") && <Button disabled={!valid || p.busy} onClick={() => run(E.stackPush(nodes, v()))}>push</Button>}
-              {can("pop") && <Button variant="outline" disabled={p.busy} onClick={() => run(E.stackPop(nodes))}>pop</Button>}
-              {can("peek") && <Button variant="secondary" disabled={p.busy} onClick={() => run(E.stackPeek(nodes))}>peek</Button>}
-              {can("isEmpty") && <Button variant="secondary" disabled={p.busy} onClick={() => run(E.stackIsEmpty(nodes))}>isEmpty</Button>}
+              {can("push") && <Button disabled={!valid || opsDisabled} onClick={() => run(E.stackPush(nodes, v()))}>push</Button>}
+              {can("pop") && <Button variant="outline" disabled={opsDisabled} onClick={() => run(E.stackPop(nodes))}>pop</Button>}
+              {can("peek") && <Button variant="secondary" disabled={opsDisabled} onClick={() => run(E.stackPeek(nodes))}>peek</Button>}
+              {can("isEmpty") && <Button variant="secondary" disabled={opsDisabled} onClick={() => run(E.stackIsEmpty(nodes))}>isEmpty</Button>}
             </Group>
-            {can("pop") && (
-              <p className={styles.hint}>
-                LIFO: o último a entrar é o primeiro a sair. Tente <b>pop</b> com a pilha vazia para ver o underflow.
-              </p>
-            )}
-          </>
-        )}
-        <InitialStateEditor nodes={nodes} disabled={p.busy} onApply={applyInitial} />
+          )}
 
-        {allowClear && (
-          <Button variant="ghost" size="sm" className={styles.clear} disabled={p.busy} onClick={clear}>
-            Esvaziar estrutura
-          </Button>
-        )}
-      </aside>
+          {stage === "desafio" ? (
+            <Button variant="ghost" size="sm" className={styles.clear} onClick={resetDesafio}>
+              Resetar desafio
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" className={styles.clear} disabled={p.busy} onClick={clear}>
+              Esvaziar estrutura
+            </Button>
+          )}
+        </aside>
+      ) : (
+        <aside className={styles.sideQuiet} aria-label="Guia do estágio">
+          <p className={styles.sideQuietText}>
+            {stage === "observar"
+              ? "Demonstração automática. Observe como cada operação muda a estrutura."
+              : "Agora preveja: antes de cada passo-chave, diga o que vai acontecer."}
+          </p>
+        </aside>
+      )}
 
       <section className={styles.main} aria-label="Visualização">
         <div className={styles.stageBar}>
@@ -333,17 +409,38 @@ export function LabWorkspace({
           </p>
         </div>
 
-        {challenge && (
-          <div className={challengeDone ? styles.challengeDone : styles.challenge} aria-live="polite">
-            <strong>{challengeDone ? "Desafio concluído." : "Desafio"}</strong>{" "}
-            {challengeDone
-              ? "Você alcançou o estado-alvo."
-              : `${challenge.prompt} Alvo: [${challenge.target.join(", ") || "vazio"}].`}
-            {challengeDone && (
-              <Button size="sm" variant="outline" className={styles.challengeNext} onClick={newChallenge}>
-                Novo desafio
-              </Button>
-            )}
+        {/* Meta do Fazer */}
+        {stage === "fazer" && goal && (
+          <div className={goalDone ? styles.challengeDone : styles.challenge} aria-live="polite">
+            <strong>{goalDone ? "Atividade concluída." : "Atividade"}</strong>{" "}
+            {goalDone ? "Você chegou ao resultado esperado." : goal.prompt}
+          </div>
+        )}
+
+        {/* Painel do Desafio: tempo, passos e meta */}
+        {stage === "desafio" && desafio && goal && (
+          <div
+            className={
+              desafio.status === "won" ? styles.challengeDone : desafio.status === "failed" ? styles.challengeFail : styles.challenge
+            }
+            aria-live="polite"
+          >
+            <div className={styles.desafioHead}>
+              <strong>
+                {desafio.status === "won" ? "Desafio concluído." : desafio.status === "failed" ? "Desafio não concluído." : "Desafio"}
+              </strong>
+              <span className={styles.desafioMeters}>
+                <span aria-label="Tempo restante">⏱ {formatSeconds(desafio.secondsLeft)}</span>
+                <span aria-label="Passos restantes">passos {stepsLeft(desafio)}/{desafio.maxSteps}</span>
+              </span>
+            </div>
+            <div>
+              {desafio.status === "won"
+                ? "Você alcançou a meta dentro do tempo e dos passos."
+                : desafio.status === "failed"
+                  ? "Acabou o tempo ou os passos. Use \"Resetar desafio\" para tentar de novo."
+                  : `${goal.prompt} Alvo: [${goal.target.join(", ") || "vazio"}].`}
+            </div>
           </div>
         )}
 
@@ -401,8 +498,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 /**
  * Autoexplicação após a operação: o aluno escreve em uma frase por que aquilo
- * aconteceu e depois compara com a explicação-modelo. É reflexão, não avaliação:
- * a resposta é opcional e o texto fica só no navegador.
+ * aconteceu e depois compara com a explicação-modelo. É reflexão, não avaliação.
  */
 function SelfExplainBox({ op, onSubmit }: { op: Op; onSubmit: (text: string) => void }) {
   const prompt = selfExplainFor(op.name);
@@ -444,59 +540,5 @@ function SelfExplainBox({ op, onSubmit }: { op: Op; onSubmit: (text: string) => 
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Edita o estado inicial da estrutura (uma lista de valores). Permite comparar
- * casos: lista vazia, um elemento, remoção do head etc. (nível "changing" de Naps).
- * O campo começa sincronizado com o estado atual e avisa valores inválidos.
- */
-function InitialStateEditor({
-  nodes,
-  disabled,
-  onApply,
-}: {
-  nodes: Node[];
-  disabled: boolean;
-  onApply: (values: number[]) => void;
-}) {
-  const current = nodesToText(nodes);
-  const [text, setText] = useState(current);
-  const [touched, setTouched] = useState(false);
-  // Enquanto o usuário não mexe, o campo acompanha o estado atual da estrutura.
-  const shown = touched ? text : current;
-  const parsed = parseInitialState(shown);
-  const changed = parsed.ok && nodesToText(nodesFromValues(parsed.values)) !== current;
-
-  return (
-    <Group title="Estado inicial">
-      <div className={styles.initialRow}>
-        <Input
-          value={shown}
-          onChange={(e) => {
-            setTouched(true);
-            setText(e.target.value);
-          }}
-          aria-label="Valores da estrutura, separados por vírgula ou espaço"
-          aria-invalid={!parsed.ok}
-          placeholder="ex.: 3, 8, 15"
-        />
-        <Button
-          size="sm"
-          disabled={disabled || !parsed.ok || !changed}
-          onClick={() => {
-            if (parsed.ok) {
-              onApply(parsed.values);
-              setTouched(false);
-            }
-          }}
-        >
-          Aplicar
-        </Button>
-      </div>
-      {!parsed.ok && <p className={styles.initialError}>{parsed.error}</p>}
-      <p className={styles.initialHint}>Troque os valores para comparar casos (vazia, um nó, remoção da cabeça).</p>
-    </Group>
   );
 }
