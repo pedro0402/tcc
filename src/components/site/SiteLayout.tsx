@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { hrefFor, type Route } from "../../routing/useHashRoute";
+import { loadTheme, safeStorage, saveTheme, type Theme } from "./theme";
 import styles from "./SiteLayout.module.css";
 
 const NAV: { route: Route; label: string }[] = [
@@ -17,18 +18,11 @@ interface SiteLayoutProps {
 
 export function SiteLayout({ route, children }: SiteLayoutProps) {
   const lab = route === "lab";
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (typeof window === "undefined") {
-      return "dark";
-    }
-
-    const savedTheme = window.localStorage.getItem("structuralab-theme");
-    return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
-  });
+  const [theme, setTheme] = useState<Theme>(() => loadTheme(safeStorage()));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("structuralab-theme", theme);
+    saveTheme(safeStorage(), theme);
   }, [theme]);
 
   return (
