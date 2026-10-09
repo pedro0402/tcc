@@ -41,7 +41,7 @@ export function LearnPage() {
               <li key={p}>{p}</li>
             ))}
           </ul>
-          <a href={`${hrefFor("lab")}?s=stack`}>Praticar pilha →</a>
+          <a href={hrefFor("lab", { s: "stack" })}>Praticar pilha →</a>
         </article>
         <article className={styles.lessonAmber}>
           <span className={styles.tagAmber}>{LIST_LESSON.badge}</span>
@@ -52,7 +52,7 @@ export function LearnPage() {
               <li key={p}>{p}</li>
             ))}
           </ul>
-          <a href={`${hrefFor("lab")}?s=list`}>Praticar lista →</a>
+          <a href={hrefFor("lab", { s: "list" })}>Praticar lista →</a>
         </article>
       </div>
 

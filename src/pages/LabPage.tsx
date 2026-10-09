@@ -6,6 +6,7 @@ import type { ListKind } from "../components/viva/Canvas";
 import { LabWorkspace } from "../components/lab/LabWorkspace";
 import { recordOperationComplete, recordPrediction } from "../persistence/localProgress";
 import { syncProgressToApi } from "../api/progressClient";
+import { navigate, parseHashParams } from "../routing/useHashRoute";
 import styles from "../components/viva/viva.module.css";
 
 // Tela de operações portada do EstruturaViva (src/routes/index.tsx),
@@ -15,8 +16,7 @@ import styles from "../components/viva/viva.module.css";
 type Tab = "lista" | "pilha";
 
 function tabFromHash(): Tab {
-  const query = window.location.hash.split("?")[1] ?? "";
-  return new URLSearchParams(query).get("s") === "stack" ? "pilha" : "lista";
+  return parseHashParams(window.location.hash).s === "stack" ? "pilha" : "lista";
 }
 
 export function LabPage() {
@@ -42,7 +42,7 @@ export function LabPage() {
   const switchTab = (t: Tab, syncHash = true) => {
     if (busy) return;
     setTab(t);
-    if (syncHash) window.location.hash = t === "lista" ? "#/lab?s=list" : "#/lab?s=stack";
+    if (syncHash) navigate("lab", { s: t === "lista" ? "list" : "stack" });
   };
 
   // Links externos (Home, Aprender) trocam a aba via hash.

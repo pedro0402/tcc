@@ -1,21 +1,43 @@
 import { useEffect, useState } from "react";
 
-export type Route = "home" | "lab" | "aprender" | "progresso" | "conta";
+// A rota "praticar" (problemas, jogos e projetos) já é reconhecida aqui, mas ainda
+// não tem página nem item no menu: entra junto com a primeira atividade da área.
+export type Route = "home" | "lab" | "praticar" | "aprender" | "progresso" | "conta";
+export type RouteParams = Record<string, string>;
 
-const ROUTES: Route[] = ["home", "lab", "aprender", "progresso", "conta"];
+const ROUTES: Route[] = ["home", "lab", "praticar", "aprender", "progresso", "conta"];
+
+/** Separa "#/rota?a=1" em caminho e query. */
+function split(hash: string): { path: string; query: string } {
+  const body = hash.replace(/^#\/?/, "");
+  const at = body.indexOf("?");
+  const path = (at < 0 ? body : body.slice(0, at)).replace(/\/+$/, "");
+  return { path, query: at < 0 ? "" : body.slice(at + 1) };
+}
 
 export function parseHash(hash: string): Route {
-  const path = hash.replace(/^#\/?/, "").split("?")[0];
-  if (path === "" || path === "/") return "home";
+  const { path } = split(hash);
+  if (path === "") return "home";
   return ROUTES.includes(path as Route) ? (path as Route) : "home";
 }
 
-export function hrefFor(route: Route): string {
-  return route === "home" ? "#/" : `#/${route}`;
+/** Parâmetros da query do hash. Repetidos ficam com o primeiro valor. */
+export function parseHashParams(hash: string): RouteParams {
+  const params: RouteParams = {};
+  for (const [key, value] of new URLSearchParams(split(hash).query)) {
+    if (!(key in params)) params[key] = value;
+  }
+  return params;
 }
 
-export function navigate(route: Route): void {
-  window.location.hash = hrefFor(route);
+export function hrefFor(route: Route, params?: RouteParams): string {
+  const base = route === "home" ? "#/" : `#/${route}`;
+  const entries = Object.entries(params ?? {}).filter(([, value]) => value !== "");
+  return entries.length ? `${base}?${new URLSearchParams(entries).toString()}` : base;
+}
+
+export function navigate(route: Route, params?: RouteParams): void {
+  window.location.hash = hrefFor(route, params);
 }
 
 export function useHashRoute(): Route {
