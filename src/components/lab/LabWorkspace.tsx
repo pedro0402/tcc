@@ -7,6 +7,17 @@ import { chain } from "../../engine/viva/links";
 import { nodesFromValues, nodesToText, parseInitialState } from "../../engine/viva/initialState";
 import { selfExplainFor } from "../../content/selfExplain";
 import { recordSelfExplanation } from "../../persistence/localProgress";
+import {
+  applyAttempt,
+  initialScaffold,
+  remainingToAdvance,
+  setStage,
+  STAGES,
+  STAGE_HINT,
+  STAGE_LABEL,
+  type ScaffoldState,
+} from "../../engine/viva/scaffold";
+import { makeChallenge, matchesTarget, type Challenge } from "../../engine/viva/challenge";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
@@ -97,6 +108,15 @@ export function LabWorkspace({
   opDoneRef.current = onOpDone;
   predictRef.current = onPredict;
 
+  // Escada de scaffolding: apoio decrescente de Observar a Desafio.
+  const [scaffold, setScaffold] = useState<ScaffoldState>(initialScaffold);
+  const scaffoldRef = useRef(scaffold);
+  scaffoldRef.current = scaffold;
+  // Desafio gerado para o estágio "desafio" (meta a alcançar).
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [challengeDone, setChallengeDone] = useState(false);
+  const challengeSeed = useRef(1);
+
   // Operação recém-concluída (sem erro), para oferecer a autoexplicação.
   const [explained, setExplained] = useState<Op | null>(null);
 
@@ -107,8 +127,19 @@ export function LabWorkspace({
     const hadError = op.steps.some((s) => s.error);
     setExplained(selfExplain && !hadError && selfExplainFor(op.name) ? op : null);
   }, [selfExplain]);
-  const handlePredict = useCallback((e: PredictEvent) => predictRef.current?.(e), []);
+  const handlePredict = useCallback((e: PredictEvent) => {
+    predictRef.current?.(e);
+    // Cada previsão respondida alimenta a escada (acerto limpo sobe; erro desce).
+    setScaffold((s) => applyAttempt(s, { correct: e.correct }));
+  }, []);
   const p = usePlayer({ onDone: handleDone, onPredict: handlePredict });
+
+  // O estágio define o apoio: Observar sem previsões; Prever e Fazer com previsões.
+  const stage = scaffold.stage;
+  useEffect(() => {
+    p.setPredictMode(stage === "prever" || stage === "fazer");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
 
   useEffect(() => {
     onBusyChange?.(p.busy);
@@ -132,6 +163,29 @@ export function LabWorkspace({
     if (!p.busy) p.start(idleOp(structure, nodes, kind));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
+
+  // Ao entrar no Desafio, gera uma meta a partir do estado atual.
+  const newChallenge = useCallback(() => {
+    const c = makeChallenge(structure, kind, nodes.map((n) => n.value), challengeSeed.current++);
+    setChallenge(c);
+    setChallengeDone(false);
+  }, [structure, kind, nodes]);
+
+  useEffect(() => {
+    if (stage === "desafio") newChallenge();
+    else setChallenge(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, structure, kind]);
+
+  // Verifica a meta do desafio sempre que o estado muda (fora de execução).
+  useEffect(() => {
+    if (stage !== "desafio" || !challenge || challengeDone || p.busy) return;
+    if (matchesTarget(challenge.target, nodes.map((n) => n.value))) {
+      setChallengeDone(true);
+      setScaffold((s) => applyAttempt(s, { correct: true }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, stage, challenge, challengeDone, p.busy]);
 
   const L = listOps(kind);
   const can = (id: OpId) => !allowed || allowed.includes(id);
@@ -239,6 +293,45 @@ export function LabWorkspace({
       </aside>
 
       <section className={styles.main} aria-label="Visualização">
+        <div className={styles.stageBar}>
+          <div className={styles.stageSwitch} role="group" aria-label="Nível de apoio">
+            {STAGES.map((st) => (
+              <Button
+                key={st}
+                size="sm"
+                variant={stage === st ? "default" : "outline"}
+                aria-pressed={stage === st}
+                disabled={p.busy}
+                onClick={() => setScaffold((s) => setStage(s, st))}
+              >
+                {STAGE_LABEL[st]}
+              </Button>
+            ))}
+          </div>
+          <p className={styles.stageHint}>
+            {STAGE_HINT[stage]}
+            {remainingToAdvance(scaffold) > 0 && stage !== "desafio" && (
+              <span className={styles.stageProgress}>
+                {" "}Faltam {remainingToAdvance(scaffold)} acerto(s) sem dica para o próximo nível.
+              </span>
+            )}
+          </p>
+        </div>
+
+        {challenge && (
+          <div className={challengeDone ? styles.challengeDone : styles.challenge} aria-live="polite">
+            <strong>{challengeDone ? "Desafio concluído." : "Desafio"}</strong>{" "}
+            {challengeDone
+              ? "Você alcançou o estado-alvo."
+              : `${challenge.prompt} Alvo: [${challenge.target.join(", ") || "vazio"}].`}
+            {challengeDone && (
+              <Button size="sm" variant="outline" className={styles.challengeNext} onClick={newChallenge}>
+                Novo desafio
+              </Button>
+            )}
+          </div>
+        )}
+
         <div className={step?.error ? styles.messageErr : styles.message} aria-live="polite">
           {step?.message}
         </div>

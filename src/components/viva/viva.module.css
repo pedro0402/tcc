@@ -809,6 +809,45 @@
   line-height: 1.5;
 }
 
+.stageBar {
+  margin: 0 16px 8px;
+}
+
+.stageSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stageHint {
+  margin: 6px 0 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.stageProgress {
+  color: var(--ev-primary);
+}
+
+.challenge,
+.challengeDone {
+  margin: 0 16px 8px;
+  padding: 12px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-border);
+  line-height: 1.5;
+}
+
+.challengeDone {
+  border-color: var(--ev-success);
+  background: color-mix(in oklch, var(--ev-success) 12%, var(--ev-card));
+}
+
+.challengeNext {
+  margin-left: 10px;
+}
+
 /* ---------- Canvas ---------- */
 @keyframes evZoomIn {
   from {
