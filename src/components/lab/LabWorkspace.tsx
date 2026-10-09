@@ -4,6 +4,7 @@ import type { Node, Op, Step, Structure } from "../../engine/viva/engine";
 import type { OpId } from "../../engine/viva/opIds";
 import { listOps } from "../../engine/viva/lists";
 import { chain } from "../../engine/viva/links";
+import { nodesFromValues, nodesToText, parseInitialState } from "../../engine/viva/initialState";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
@@ -79,6 +80,9 @@ export function LabWorkspace({
   const isList = structure === "linkedList";
   const [val, setVal] = useState("42");
   const [pos, setPos] = useState("1");
+  // Nível de detalhe: "essencial" esconde o painel de variáveis para reduzir a
+  // carga cognitiva (TCAM/Sweller); "completo" mostra tudo.
+  const [detail, setDetail] = useState<"essencial" | "completo">("completo");
 
   // Callbacks por ref: o player recebe funções estáveis mesmo se o pai recriar as suas.
   const nodesChangeRef = useRef(onNodesChange);
@@ -138,6 +142,13 @@ export function LabWorkspace({
   const clear = () => {
     onNodesChange([], structure);
     p.start(idleOp(structure, [], kind));
+  };
+
+  // Define o estado inicial da estrutura a partir de uma lista de valores.
+  const applyInitial = (values: number[]) => {
+    const next = nodesFromValues(values);
+    onNodesChange(next, structure);
+    p.start(idleOp(structure, next, kind));
   };
 
   return (
@@ -204,6 +215,8 @@ export function LabWorkspace({
             )}
           </>
         )}
+        <InitialStateEditor nodes={nodes} disabled={p.busy} onApply={applyInitial} />
+
         {allowClear && (
           <Button variant="ghost" size="sm" className={styles.clear} disabled={p.busy} onClick={clear}>
             Esvaziar estrutura
@@ -223,7 +236,20 @@ export function LabWorkspace({
       </section>
 
       <aside className={styles.codeAside} aria-label="Código">
-        <CodePanel p={p} />
+        <div className={styles.detailRow} role="group" aria-label="Nível de detalhe">
+          {(["essencial", "completo"] as const).map((d) => (
+            <Button
+              key={d}
+              size="sm"
+              variant={detail === d ? "default" : "outline"}
+              aria-pressed={detail === d}
+              onClick={() => setDetail(d)}
+            >
+              {d === "essencial" ? "Essencial" : "Completo"}
+            </Button>
+          ))}
+        </div>
+        <CodePanel p={p} showVars={detail === "completo"} />
       </aside>
     </div>
   );
@@ -235,5 +261,59 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
       <div className={styles.groupTitle}>{title}</div>
       <div className={styles.groupBody}>{children}</div>
     </div>
+  );
+}
+
+/**
+ * Edita o estado inicial da estrutura (uma lista de valores). Permite comparar
+ * casos: lista vazia, um elemento, remoção do head etc. (nível "changing" de Naps).
+ * O campo começa sincronizado com o estado atual e avisa valores inválidos.
+ */
+function InitialStateEditor({
+  nodes,
+  disabled,
+  onApply,
+}: {
+  nodes: Node[];
+  disabled: boolean;
+  onApply: (values: number[]) => void;
+}) {
+  const current = nodesToText(nodes);
+  const [text, setText] = useState(current);
+  const [touched, setTouched] = useState(false);
+  // Enquanto o usuário não mexe, o campo acompanha o estado atual da estrutura.
+  const shown = touched ? text : current;
+  const parsed = parseInitialState(shown);
+  const changed = parsed.ok && nodesToText(nodesFromValues(parsed.values)) !== current;
+
+  return (
+    <Group title="Estado inicial">
+      <div className={styles.initialRow}>
+        <Input
+          value={shown}
+          onChange={(e) => {
+            setTouched(true);
+            setText(e.target.value);
+          }}
+          aria-label="Valores da estrutura, separados por vírgula ou espaço"
+          aria-invalid={!parsed.ok}
+          placeholder="ex.: 3, 8, 15"
+        />
+        <Button
+          size="sm"
+          disabled={disabled || !parsed.ok || !changed}
+          onClick={() => {
+            if (parsed.ok) {
+              onApply(parsed.values);
+              setTouched(false);
+            }
+          }}
+        >
+          Aplicar
+        </Button>
+      </div>
+      {!parsed.ok && <p className={styles.initialError}>{parsed.error}</p>}
+      <p className={styles.initialHint}>Troque os valores para comparar casos (vazia, um nó, remoção da cabeça).</p>
+    </Group>
   );
 }
