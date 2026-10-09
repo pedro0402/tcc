@@ -125,7 +125,12 @@ export function dInsertHead(list: Node[], value: number): Op {
         predict: ask(
           "novo.prox já aponta para a cabeça. Qual é o próximo passo?",
           "cabeca.ant = novo",
-          ["cabeca = novo", "cauda = novo", "novo.ant = cabeca"],
+          [
+            { text: "cabeca = novo", misconception: "ordem-religacao-insercao" },
+            { text: "cauda = novo", misconception: "no-vs-ponteiro" },
+            { text: "novo.ant = cabeca", misconception: "dupla-um-lado" },
+          ],
+          { id: "dlist.insertHead.ant", concept: "dupla.ant", explain: "Numa lista dupla toda ligação tem volta: a cabeça antiga precisa apontar de volta (ant) para o novo nó antes de a cabeça mudar." },
         ),
       }),
     );
@@ -177,7 +182,12 @@ export function dInsertTail(list: Node[], value: number): Op {
         predict: ask(
           "novo.ant já aponta para a cauda. O que liga a cauda ao novo nó?",
           "cauda.prox = novo",
-          ["cauda = novo", "novo.prox = cauda", "percorrer a lista até o fim"],
+          [
+            { text: "cauda = novo", misconception: "no-vs-ponteiro" },
+            { text: "novo.prox = cauda", misconception: "dupla-um-lado" },
+            "percorrer a lista até o fim",
+          ],
+          { id: "dlist.insertTail.prox", concept: "dupla.ant", explain: "A cauda guarda o último nó, então não é preciso percorrer: a cauda aponta para o novo, que já aponta de volta para ela." },
         ),
       }),
     );
@@ -246,7 +256,12 @@ export function dInsertAt(list: Node[], pos: number, value: number): Op {
       predict: ask(
         "novo aponta para os dois vizinhos, mas eles ainda não apontam para novo. Qual ligação vem primeiro?",
         "atual.prox.ant = novo",
-        ["atual.prox = novo", "cabeca.ant = novo", "novo.prox = null"],
+        [
+          { text: "atual.prox = novo", misconception: "ordem-religacao-insercao" },
+          { text: "cabeca.ant = novo", misconception: "no-vs-ponteiro" },
+          { text: "novo.prox = null", misconception: "null-significado" },
+        ],
+        { id: "dlist.insertAt.ant", concept: "dupla.ant", explain: "O vizinho da direita precisa apontar de volta (ant) para o novo nó antes de atual.prox mudar; senão a volta da lista fica errada." },
       ),
     }),
   );
@@ -285,7 +300,12 @@ function dRelink(list: Node[], pos: number, lines: RemovalLines): Step[] {
         predict: ask(
           "Como saltamos o alvo pelo lado esquerdo?",
           "alvo.ant.prox = alvo.prox",
-          ["alvo.prox = null", "alvo.ant = alvo.prox", "cabeca = alvo.ant"],
+          [
+            { text: "alvo.prox = null", misconception: "ordem-religacao-remocao" },
+            { text: "alvo.ant = alvo.prox", misconception: "dupla-um-lado" },
+            { text: "cabeca = alvo.ant", misconception: "no-vs-ponteiro" },
+          ],
+          { id: "dlist.remove.left", concept: "lista.religar-remocao", explain: "O vizinho da esquerda (alvo.ant) passa a apontar para o seguinte do alvo. Depois o da direita aponta de volta." },
         ),
       }),
     );
@@ -297,7 +317,12 @@ function dRelink(list: Node[], pos: number, lines: RemovalLines): Step[] {
         predict: ask(
           "O alvo é a cabeça (não tem anterior). O que muda?",
           "cabeca passa a ser alvo.prox",
-          ["alvo.ant.prox = alvo.prox", "cauda = alvo.prox", "alvo.prox = null"],
+          [
+            { text: "alvo.ant.prox = alvo.prox", misconception: "null-significado" },
+            { text: "cauda = alvo.prox", misconception: "no-vs-ponteiro" },
+            { text: "alvo.prox = null", misconception: "ordem-religacao-remocao" },
+          ],
+          { id: "dlist.remove.head", concept: "lista.cabeca", explain: "Sem anterior, não há quem religar à esquerda: a cabeça apenas avança para o próximo nó." },
         ),
       }),
     );
@@ -391,7 +416,12 @@ export function dSearch(list: Node[], value: number): Op {
       listStep({
         line: 4, nodes: list, links, pointers: ends(m, { atual: i + 1 < m ? i + 1 : null }), message: "Avançamos.", vars: { i: `${i + 1}` },
         predict: i === 0
-          ? ask(`${list[i].value} é diferente de ${value}. E agora?`, "atual avança para o próximo nó", ["Retorna -1", "Retorna 0", "Remove o nó"])
+          ? ask(
+              `${list[i].value} é diferente de ${value}. E agora?`,
+              "atual avança para o próximo nó",
+              ["Retorna -1", "Retorna 0", { text: "Remove o nó", misconception: "no-vs-ponteiro" }],
+              { id: "dlist.search.percurso", concept: "lista.percurso", explain: "A busca percorre a lista para frente; só devolve -1 depois de passar por todos os nós." },
+            )
           : undefined,
       }),
     );

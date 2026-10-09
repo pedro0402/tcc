@@ -13,6 +13,10 @@ export interface PlayerState {
   asking: number | null;
   /** passo -> alternativa escolhida */
   answered: Record<number, number>;
+  /** Pedir o nível de confiança antes de revelar as opções. */
+  confidenceMode: boolean;
+  /** passo -> confiança declarada (0 chute, 1 acho, 2 certeza). */
+  confidence: Record<number, 0 | 1 | 2>;
   /** Placar da sessão: sobrevive à troca de operação. */
   score: { ok: number; total: number };
   /**
@@ -30,6 +34,8 @@ export const initialPlayerState: PlayerState = {
   predictMode: true,
   asking: null,
   answered: {},
+  confidenceMode: false,
+  confidence: {},
   score: { ok: 0, total: 0 },
   finished: false,
 };
@@ -39,13 +45,23 @@ export type PlayerAction =
   | { type: "NEXT" }
   | { type: "PREV" }
   | { type: "ANSWER"; choice: number }
+  | { type: "SET_CONFIDENCE"; level: 0 | 1 | 2 }
   | { type: "CONTINUE" }
   | { type: "SKIP" }
   | { type: "RESTART" }
   | { type: "DONE" }
   | { type: "SET_PLAYING"; playing: boolean }
   | { type: "SET_SPEED"; speed: number }
-  | { type: "SET_PREDICT_MODE"; on: boolean };
+  | { type: "SET_PREDICT_MODE"; on: boolean }
+  | { type: "SET_CONFIDENCE_MODE"; on: boolean };
+
+/**
+ * Com o modo confiança ligado, o aluno precisa declarar o nível antes de ver
+ * as opções: a previsão fica "travada" até isso acontecer.
+ */
+export function needsConfidence(s: PlayerState): boolean {
+  return s.confidenceMode && s.asking !== null && s.confidence[s.asking] === undefined;
+}
 
 /** A resposta só vale com uma previsão aberta e ainda sem resposta. */
 export function canAnswer(s: PlayerState): boolean {
@@ -75,6 +91,7 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
         op: a.op,
         idx: 0,
         answered: {},
+        confidence: {},
         asking: null,
         finished: false,
         playing: a.autoPlay ?? true,
@@ -94,13 +111,21 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
       return { ...s, playing: false, asking: null, idx: Math.max(0, s.idx - 1) };
 
     case "ANSWER": {
-      if (!canAnswer(s)) return s;
+      // Com o modo confiança ligado, não aceita resposta antes do nível.
+      if (!canAnswer(s) || needsConfidence(s)) return s;
       const correct = isCorrectAnswer(s, a.choice);
       return {
         ...s,
         answered: { ...s.answered, [s.asking as number]: a.choice },
         score: { ok: s.score.ok + (correct ? 1 : 0), total: s.score.total + 1 },
       };
+    }
+
+    case "SET_CONFIDENCE": {
+      // Só antes de responder, e sem permitir trocar depois de declarado.
+      if (s.asking === null || s.answered[s.asking] !== undefined) return s;
+      if (s.confidence[s.asking] !== undefined) return s;
+      return { ...s, confidence: { ...s.confidence, [s.asking]: a.level } };
     }
 
     case "CONTINUE":
@@ -125,5 +150,8 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
 
     case "SET_PREDICT_MODE":
       return { ...s, predictMode: a.on };
+
+    case "SET_CONFIDENCE_MODE":
+      return { ...s, confidenceMode: a.on };
   }
 }

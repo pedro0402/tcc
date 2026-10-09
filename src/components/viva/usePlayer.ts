@@ -5,16 +5,27 @@ import {
   initialPlayerState,
   isBusy,
   isCorrectAnswer,
+  needsConfidence,
   playerReducer,
   shouldFireDone,
 } from "./playerReducer";
+
+import type { ConceptId } from "../../engine/viva/engine";
+import type { MisconceptionId } from "../../content/misconceptions";
 
 export interface PredictEvent {
   op: Op;
   /** Índice do passo que a previsão revela. */
   stepIndex: number;
+  /** Identificador estável da pergunta, quando houver. */
+  predictId?: string;
+  concept?: ConceptId;
   chosen: number;
   correct: boolean;
+  /** Engano representado pela alternativa escolhida (undefined se acertou). */
+  misconception?: MisconceptionId;
+  /** Confiança declarada antes de responder (0 chute, 1 acho, 2 certeza). */
+  confidence?: 0 | 1 | 2;
 }
 
 interface PlayerCallbacks {
@@ -25,7 +36,7 @@ interface PlayerCallbacks {
 /** Player do EstruturaViva: reprodução, modo previsão e placar. */
 export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
-  const { op, idx, playing, speed, predictMode, asking, answered, score } = state;
+  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence } = state;
 
   const start = (o: Op, opts: { autoPlay?: boolean } = {}) =>
     dispatch({ type: "START", op: o, autoPlay: opts.autoPlay });
@@ -33,13 +44,18 @@ export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
   const next = () => dispatch({ type: "NEXT" });
 
   const answer = (choice: number) => {
-    if (!canAnswer(state) || !op || asking === null) return;
+    if (!canAnswer(state) || needsConfidence(state) || !op || asking === null) return;
     dispatch({ type: "ANSWER", choice });
+    const predict = op.steps[asking].predict;
     onPredict?.({
       op,
       stepIndex: asking,
+      predictId: predict?.id,
+      concept: predict?.concept,
       chosen: choice,
       correct: isCorrectAnswer(state, choice),
+      misconception: predict?.misconceptions?.[choice],
+      confidence: confidence[asking],
     });
   };
 
@@ -70,6 +86,11 @@ export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
     setSpeed: (v: number) => dispatch({ type: "SET_SPEED", speed: v }),
     predictMode,
     setPredictMode: (on: boolean) => dispatch({ type: "SET_PREDICT_MODE", on }),
+    confidenceMode,
+    setConfidenceMode: (on: boolean) => dispatch({ type: "SET_CONFIDENCE_MODE", on }),
+    confidence,
+    setConfidence: (level: 0 | 1 | 2) => dispatch({ type: "SET_CONFIDENCE", level }),
+    needsConfidence: needsConfidence(state),
     asking,
     answered,
     answer,

@@ -5,10 +5,42 @@
 // pausa ANTES de mostrar esse passo, então o aluno responde vendo o passo
 // anterior e depois confere a resposta no desenho.
 
+import type { MisconceptionId } from "../../content/misconceptions";
 import type { Links, ListKind } from "./links";
 
 export type Node = { id: number; value: number };
-export type Predict = { question: string; options: string[]; answer: number };
+
+/** Conceito que uma previsão exercita. Usado no feedback e no registro de progresso. */
+export type ConceptId =
+  | "pilha.lifo"
+  | "pilha.underflow"
+  | "pilha.topo"
+  | "lista.cabeca"
+  | "lista.percurso"
+  | "lista.religar-insercao"
+  | "lista.religar-remocao"
+  | "dupla.ant"
+  | "circular.parada"
+  | "circular.retorno";
+
+export type Predict = {
+  question: string;
+  options: string[];
+  answer: number;
+  /** Identificador estável da pergunta (para eventos). Opcional por retrocompatibilidade. */
+  id?: string;
+  /** Conceito exercitado. */
+  concept?: ConceptId;
+  /** Explicação mostrada depois de responder (vale para acerto e erro). */
+  explain?: string;
+  /** Por alternativa, o engano que ela representa (undefined na alternativa certa). */
+  misconceptions?: Array<MisconceptionId | undefined>;
+};
+
+/** Uma alternativa de previsão: texto simples ou texto com o engano que representa. */
+export type Choice = string | { text: string; misconception?: MisconceptionId };
+const choiceText = (c: Choice) => (typeof c === "string" ? c : c.text);
+const choiceMiscon = (c: Choice) => (typeof c === "string" ? undefined : c.misconception);
 export type Step = {
   line: number; // índice da linha de código (0-based), -1 = nenhuma
   nodes: Node[];
@@ -36,18 +68,39 @@ export type Op = {
 let nextId = 1;
 export const mk = (value: number): Node => ({ id: nextId++, value });
 
-function shuffle(correct: string, wrong: string[]): Omit<Predict, "question"> {
-  const opts = Array.from(new Set([correct, ...wrong])).slice(0, 4);
-  for (let i = opts.length - 1; i > 0; i--) {
+/** Embaralha as alternativas, remove repetidas pelo texto e segue o engano de cada uma. */
+function shuffle(correct: Choice, wrong: Choice[]): Pick<Predict, "options" | "answer" | "misconceptions"> {
+  const all: Choice[] = [correct, ...wrong];
+  const seen = new Set<string>();
+  const uniq = all.filter((c) => {
+    const t = choiceText(c);
+    if (seen.has(t)) return false;
+    seen.add(t);
+    return true;
+  });
+  const correctText = choiceText(correct);
+  for (let i = uniq.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [opts[i], opts[j]] = [opts[j], opts[i]];
+    [uniq[i], uniq[j]] = [uniq[j], uniq[i]];
   }
-  return { options: opts, answer: opts.indexOf(correct) };
+  return {
+    options: uniq.map(choiceText),
+    answer: uniq.findIndex((c) => choiceText(c) === correctText),
+    misconceptions: uniq.map(choiceMiscon),
+  };
 }
 
-export const ask = (question: string, correct: string, wrong: string[]): Predict => ({
-  ...shuffle(correct, wrong),
+/** Metadados opcionais de uma previsão: identificador, conceito e explicação. */
+export interface AskMeta {
+  id?: string;
+  concept?: ConceptId;
+  explain?: string;
+}
+
+export const ask = (question: string, correct: Choice, wrong: Choice[], meta: AskMeta = {}): Predict => ({
   question,
+  ...shuffle(correct, wrong),
+  ...meta,
 });
 
 export const valOrNull = (n: Node | undefined) => (n ? `${n.value}` : "null");
@@ -80,7 +133,20 @@ export function stackPush(stack: Node[], value: number): Op {
     { line: 1, nodes: withN, pointers: { topo: top === null ? null : 1, novo: 0 }, highlight: [n.id], message: `Criamos um novo nó com o valor ${value}.`, vars: { valor: `${value}`, "novo.prox": "null" } },
     { line: 2, nodes: withN, pointers: { topo: top === null ? null : 1, novo: 0 }, highlight: [n.id], message: `novo.prox passa a apontar para o topo atual (${valOrNull(stack[0])}).`, vars: { "novo.prox": valOrNull(stack[0]) } },
     { line: 3, nodes: withN, pointers: { topo: 0 }, highlight: [n.id], message: `O topo agora é o nó ${value}.`, vars: { topo: `${value}` },
-      predict: ask("Qual será o próximo passo?", "topo passa a apontar para o novo nó", ["O novo nó é colocado no fim da pilha", "tamanho é decrementado", "O topo antigo é removido"]) },
+      predict: ask(
+        "Qual será o próximo passo?",
+        "topo passa a apontar para o novo nó",
+        [
+          { text: "O novo nó é colocado no fim da pilha", misconception: "lifo-vs-fifo" },
+          "tamanho é decrementado",
+          { text: "O topo antigo é removido", misconception: "no-vs-ponteiro" },
+        ],
+        {
+          id: "stack.push.topo",
+          concept: "pilha.topo",
+          explain: "O topo passa a referenciar o novo nó, que já aponta para o topo antigo. Nada é removido.",
+        },
+      ) },
     { line: 4, nodes: withN, pointers: { topo: 0 }, highlight: [], message: `Tamanho atualizado para ${stack.length + 1}.`, vars: { tamanho: `${stack.length + 1}` } },
   ];
   return { name: "push", structure: "stack", steps, code: stackCode.push, final: withN };
@@ -89,11 +155,35 @@ export function stackPush(stack: Node[], value: number): Op {
 export function stackPop(stack: Node[]): Op {
   const code = stackCode.pop;
   const empty = !stack.length;
-  const guess = ask(
-    empty ? "A pilha está vazia. O que acontece?" : "A pilha tem elementos. O que acontece?",
-    empty ? "Lança erro de underflow" : "Lê o valor do topo",
-    empty ? ["Retorna 0", "Remove o último nó", "Cria um nó vazio"] : ["Lança erro de underflow", "Percorre até o fim", "Insere null"],
-  );
+  const guess = empty
+    ? ask(
+        "A pilha está vazia. O que acontece?",
+        "Lança erro de underflow",
+        [
+          { text: "Retorna 0", misconception: "null-significado" },
+          { text: "Remove o último nó", misconception: "lifo-vs-fifo" },
+          "Cria um nó vazio",
+        ],
+        {
+          id: "stack.pop.underflow",
+          concept: "pilha.underflow",
+          explain: "Sem elementos, não há topo para remover: o pop sinaliza underflow em vez de devolver um valor.",
+        },
+      )
+    : ask(
+        "A pilha tem elementos. O que acontece?",
+        "Lê o valor do topo",
+        [
+          "Lança erro de underflow",
+          { text: "Percorre até o fim", misconception: "lifo-vs-fifo" },
+          "Insere null",
+        ],
+        {
+          id: "stack.pop.topo",
+          concept: "pilha.topo",
+          explain: "O pop age no topo: guarda o valor do topo e depois faz o topo avançar para o próximo nó.",
+        },
+      );
   const steps: Step[] = [
     { line: 0, nodes: stack, pointers: { topo: empty ? null : 0 }, highlight: [], message: "Chamando pop().", vars: {} },
     { line: 1, nodes: stack, pointers: { topo: empty ? null : 0 }, highlight: [], message: "Verificamos se a pilha está vazia.", vars: { "topo == null": `${empty}` } },
@@ -211,7 +301,20 @@ export function listInsertHead(list: Node[], value: number): Op {
     { line: 1, nodes: nl, pointers: { cabeca: list.length ? 1 : null, novo: 0 }, highlight: [n.id], message: `Novo nó ${value} criado.`, vars: {} },
     { line: 2, nodes: nl, pointers: { cabeca: list.length ? 1 : null, novo: 0 }, highlight: [n.id], message: `novo.prox aponta para a cabeça atual (${valOrNull(list[0])}).`, vars: { "novo.prox": valOrNull(list[0]) } },
     { line: 3, nodes: nl, pointers: { cabeca: 0 }, highlight: [], message: `A cabeça agora é ${value}.`, vars: { cabeca: `${value}` },
-      predict: ask("E agora?", "cabeca passa a apontar para o novo nó", ["Percorremos a lista até o fim", "O nó antigo é removido", "novo.prox recebe null"]) },
+      predict: ask(
+        "E agora?",
+        "cabeca passa a apontar para o novo nó",
+        [
+          { text: "Percorremos a lista até o fim", misconception: "ordem-religacao-insercao" },
+          { text: "O nó antigo é removido", misconception: "no-vs-ponteiro" },
+          { text: "novo.prox recebe null", misconception: "null-significado" },
+        ],
+        {
+          id: "list.insertHead.cabeca",
+          concept: "lista.cabeca",
+          explain: "Inserir no início não percorre a lista: o novo nó já aponta para a cabeça antiga, e a cabeça passa a ser ele.",
+        },
+      ) },
   ]);
 }
 
@@ -233,7 +336,16 @@ export function listInsertTail(list: Node[], value: number): Op {
   for (let i = 0; i < list.length - 1; i++) {
     s.push({ line: 4, nodes: list, pointers: { cabeca: 0, atual: i }, highlight: [list[i].id], message: `atual.prox (${list[i + 1].value}) não é null, continuamos.`, vars: { atual: `${list[i].value}` } });
     s.push({ line: 5, nodes: list, pointers: { cabeca: 0, atual: i + 1 }, highlight: [list[i + 1].id], message: `atual avança para ${list[i + 1].value}.`, vars: { atual: `${list[i + 1].value}` },
-      predict: i === 0 ? ask("atual.prox != null. O que acontece?", "atual avança para o próximo nó", ["O novo nó é ligado aqui", "O laço termina", "A cabeça muda"]) : undefined });
+      predict: i === 0 ? ask(
+        "atual.prox != null. O que acontece?",
+        "atual avança para o próximo nó",
+        [
+          { text: "O novo nó é ligado aqui", misconception: "ordem-religacao-insercao" },
+          { text: "O laço termina", misconception: "null-significado" },
+          "A cabeça muda",
+        ],
+        { id: "list.insertTail.percurso", concept: "lista.percurso", explain: "Enquanto o próximo não for null, ainda não chegamos ao fim: atual avança até o último nó." },
+      ) : undefined });
   }
   const last = list.length - 1;
   s.push({ line: 4, nodes: list, pointers: { cabeca: 0, atual: last }, highlight: [list[last].id], message: "atual.prox é null: chegamos ao último nó.", vars: { "atual.prox": "null" } });
@@ -267,7 +379,16 @@ export function listInsertAt(list: Node[], pos: number, value: number): Op {
   const withN = [...list.slice(0, pos), n, ...list.slice(pos)];
   s.push({ line: 5, nodes: list, pointers: { cabeca: 0, atual: a }, highlight: [list[a].id], message: `atual está na posição ${a}. Criamos o nó ${value}.`, vars: {} });
   s.push({ line: 6, nodes: withN, pointers: { cabeca: 0, atual: a, novo: pos }, highlight: [n.id], message: `novo.prox aponta para ${valOrNull(list[pos])} (evita perder o resto da lista).`, vars: {},
-    predict: ask("Qual ligação deve ser feita primeiro?", "novo.prox = atual.prox", ["atual.prox = novo", "cabeca = novo", "atual = null"]) });
+    predict: ask(
+      "Qual ligação deve ser feita primeiro?",
+      "novo.prox = atual.prox",
+      [
+        { text: "atual.prox = novo", misconception: "ordem-religacao-insercao" },
+        { text: "cabeca = novo", misconception: "no-vs-ponteiro" },
+        { text: "atual = null", misconception: "null-significado" },
+      ],
+      { id: "list.insertAt.ordem", concept: "lista.religar-insercao", explain: "Primeiro o novo nó aponta para o resto da lista (novo.prox = atual.prox). Só então atual aponta para o novo; o contrário perde os nós seguintes." },
+    ) });
   s.push({ line: 7, nodes: withN, pointers: { cabeca: 0 }, highlight: [n.id], message: `atual.prox aponta para ${value}. Inserção concluída.`, vars: {} });
   return listOp("inserirEm", code, withN, s);
 }
@@ -294,7 +415,16 @@ export function listRemoveAt(list: Node[], pos: number): Op {
   for (let i = 0; i < pos - 1; i++) s.push({ line: 4, nodes: list, pointers: { cabeca: 0, anterior: i + 1 }, highlight: [list[i + 1].id], message: `anterior avança para ${list[i + 1].value}.`, vars: { i: `${i + 1}` } });
   s.push({ line: 5, nodes: list, pointers: { cabeca: 0, anterior: pos - 1, alvo: pos }, highlight: [list[pos].id], message: `alvo = ${list[pos].value}.`, vars: {} });
   s.push({ line: 6, nodes: list, pointers: { cabeca: 0, anterior: pos - 1 }, highlight: [], removing: list[pos].id, message: `anterior pula o alvo e aponta para ${valOrNull(list[pos + 1])}.`, vars: {},
-    predict: ask("Como desligamos o alvo?", "anterior.prox = alvo.prox", ["alvo.prox = null apenas", "cabeca = alvo", "anterior = alvo"]) });
+    predict: ask(
+      "Como desligamos o alvo?",
+      "anterior.prox = alvo.prox",
+      [
+        { text: "alvo.prox = null apenas", misconception: "ordem-religacao-remocao" },
+        { text: "cabeca = alvo", misconception: "no-vs-ponteiro" },
+        { text: "anterior = alvo", misconception: "no-vs-ponteiro" },
+      ],
+      { id: "list.removeAt.ordem", concept: "lista.religar-remocao", explain: "O anterior passa a apontar para o seguinte do alvo (anterior.prox = alvo.prox). O alvo deixa de ser alcançável." },
+    ) });
   s.push({ line: 6, nodes: rest, pointers: { cabeca: 0 }, highlight: [], message: `Nó ${list[pos].value} removido.`, vars: {} });
   return listOp("removerEm", code, rest, s);
 }
@@ -313,7 +443,16 @@ export function listRemoveValue(list: Node[], value: number): Op {
     s.push(
       { line: 2, nodes: list, pointers: { cabeca: 0 }, highlight: [list[0].id], message: `A cabeça guarda ${value}.`, vars: { "cabeca.valor": `${value}` } },
       { line: 2, nodes: list, pointers: { cabeca: list.length > 1 ? 1 : null }, highlight: [], removing: list[0].id, message: `cabeca avança para ${valOrNull(list[1])}.`, vars: { cabeca: valOrNull(list[1]) },
-        predict: ask("O valor está na cabeça. O que fazemos?", "cabeca passa a apontar para cabeca.prox", ["Percorremos até o fim", "Apagamos a lista inteira", "anterior.prox = null"]) },
+        predict: ask(
+          "O valor está na cabeça. O que fazemos?",
+          "cabeca passa a apontar para cabeca.prox",
+          [
+            { text: "Percorremos até o fim", misconception: "no-vs-ponteiro" },
+            { text: "Apagamos a lista inteira", misconception: "no-vs-ponteiro" },
+            { text: "anterior.prox = null", misconception: "ordem-religacao-remocao" },
+          ],
+          { id: "list.removeValue.cabeca", concept: "lista.cabeca", explain: "Se o valor está na cabeça, basta a cabeça avançar para o próximo nó; não é preciso percorrer a lista." },
+        ) },
       { line: 2, nodes: rest, pointers: { cabeca: rest.length ? 0 : null }, highlight: [], message: `Nó ${value} removido.`, vars: {} },
     );
     return listOp("removerValor", code, rest, s);
@@ -324,7 +463,16 @@ export function listRemoveValue(list: Node[], value: number): Op {
   while (i + 1 < list.length && list[i + 1].value !== value) {
     s.push({ line: 4, nodes: list, pointers: { cabeca: 0, anterior: i }, highlight: [list[i + 1].id], message: `anterior.prox é ${list[i + 1].value}, diferente de ${value}.`, vars: { "anterior.prox.valor": `${list[i + 1].value}` } });
     s.push({ line: 5, nodes: list, pointers: { cabeca: 0, anterior: i + 1 }, highlight: [list[i + 1].id], message: `anterior avança para ${list[i + 1].value}.`, vars: { anterior: `${list[i + 1].value}` },
-      predict: i === 0 ? ask(`${list[1].value} ≠ ${value}. E agora?`, "anterior avança para o próximo nó", ["Removemos o nó atual", "O laço termina", "A cabeça muda"]) : undefined });
+      predict: i === 0 ? ask(
+        `${list[1].value} ≠ ${value}. E agora?`,
+        "anterior avança para o próximo nó",
+        [
+          { text: "Removemos o nó atual", misconception: "ordem-religacao-remocao" },
+          { text: "O laço termina", misconception: "null-significado" },
+          "A cabeça muda",
+        ],
+        { id: "list.removeValue.percurso", concept: "lista.percurso", explain: "Enquanto o próximo não for o valor procurado, seguimos avançando o ponteiro anterior pela lista." },
+      ) : undefined });
     i++;
   }
   if (i + 1 >= list.length) {
@@ -334,7 +482,16 @@ export function listRemoveValue(list: Node[], value: number): Op {
   const target = list[i + 1];
   s.push({ line: 4, nodes: list, pointers: { cabeca: 0, anterior: i, alvo: i + 1 }, highlight: [target.id], message: `anterior.prox guarda ${value}: encontramos o alvo.`, vars: { "anterior.prox.valor": `${value}` } });
   s.push({ line: 7, nodes: list, pointers: { cabeca: 0, anterior: i }, highlight: [], removing: target.id, message: `anterior pula o alvo e aponta para ${valOrNull(list[i + 2])}.`, vars: { "anterior.prox": valOrNull(list[i + 2]) },
-    predict: ask("Como desligamos o alvo?", "anterior.prox = anterior.prox.prox", ["alvo.prox = null apenas", "cabeca = alvo", "anterior = null"]) });
+    predict: ask(
+      "Como desligamos o alvo?",
+      "anterior.prox = anterior.prox.prox",
+      [
+        { text: "alvo.prox = null apenas", misconception: "ordem-religacao-remocao" },
+        { text: "cabeca = alvo", misconception: "no-vs-ponteiro" },
+        { text: "anterior = null", misconception: "null-significado" },
+      ],
+      { id: "list.removeValue.ordem", concept: "lista.religar-remocao", explain: "O anterior salta o alvo apontando para o seguinte dele. O alvo fica fora da cadeia." },
+    ) });
   s.push({ line: 7, nodes: rest, pointers: { cabeca: 0 }, highlight: [], message: `Nó ${value} removido.`, vars: {} });
   return listOp("removerValor", code, rest, s);
 }
@@ -348,7 +505,16 @@ export function listSearch(list: Node[], value: number): Op {
     s.push({ line: 3, nodes: list, pointers: { cabeca: 0, atual: i }, highlight: [list[i].id], message: hit ? `Encontrado na posição ${i}!` : `${list[i].value} ≠ ${value}.`, vars: { retorno: hit ? `${i}` : "-" } });
     if (hit) return listOp("buscar", code, list, s);
     s.push({ line: 4, nodes: list, pointers: { cabeca: 0, atual: i + 1 < list.length ? i + 1 : null }, highlight: [], message: "Avançamos.", vars: { i: `${i + 1}` },
-      predict: i === 0 ? ask(`${list[i].value} é diferente de ${value}. E agora?`, "atual avança para o próximo nó", ["Retorna -1", "Retorna 0", "Remove o nó"]) : undefined });
+      predict: i === 0 ? ask(
+        `${list[i].value} é diferente de ${value}. E agora?`,
+        "atual avança para o próximo nó",
+        [
+          "Retorna -1",
+          "Retorna 0",
+          { text: "Remove o nó", misconception: "no-vs-ponteiro" },
+        ],
+        { id: "list.search.percurso", concept: "lista.percurso", explain: "Só devolvemos -1 depois de percorrer tudo. Enquanto houver próximo, atual avança para continuar a busca." },
+      ) : undefined });
   }
   s.push({ line: 6, nodes: list, pointers: { cabeca: list.length ? 0 : null }, highlight: [], message: `${value} não está na lista. Retorna -1.`, vars: { retorno: "-1" }, error: true });
   return listOp("buscar", code, list, s);

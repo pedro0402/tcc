@@ -687,6 +687,77 @@
   font-weight: 500;
 }
 
+.predictFoot {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.predictVerdict {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.predictFoot .btn {
+  align-self: flex-end;
+}
+
+.confidence {
+  margin-top: 12px;
+}
+
+.confidenceLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ev-muted-fg);
+  font-size: 0.85rem;
+}
+
+.confidenceOpts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confidenceBtn {
+  flex: 1 1 auto;
+  padding: 8px 12px;
+  border-radius: calc(var(--ev-radius) - 4px);
+  border: 1px solid var(--ev-border);
+  background: var(--ev-card);
+  color: var(--ev-fg);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.confidenceBtn:hover {
+  border-color: var(--ev-primary);
+}
+
+.detailRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.initialRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.initialError {
+  margin: 6px 0 0;
+  color: var(--ev-destructive);
+  font-size: 0.8rem;
+}
+
+.initialHint {
+  margin: 6px 0 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 /* ---------- Canvas ---------- */
 @keyframes evZoomIn {
   from {

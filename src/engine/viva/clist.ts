@@ -95,7 +95,12 @@ const stopQuestion = (): Predict =>
   ask(
     "Numa lista circular nenhum prox é null. Quando o laço para?",
     "quando ultimo.prox volta a ser a cabeça",
-    ["quando ultimo.prox é null", "quando ultimo é null", "quando i chega ao tamanho"],
+    [
+      { text: "quando ultimo.prox é null", misconception: "circular-parada" },
+      { text: "quando ultimo é null", misconception: "circular-parada" },
+      "quando i chega ao tamanho",
+    ],
+    { id: "clist.parada", concept: "circular.parada", explain: "Numa lista circular nenhum prox é null; o laço para quando o próximo volta a ser a cabeça." },
   );
 
 /**
@@ -167,7 +172,12 @@ export function cInsertHead(list: Node[], value: number): Op {
     predict: ask(
       "novo.prox já aponta para a cabeça. Qual ligação mantém a lista circular?",
       "ultimo.prox = novo",
-      ["ultimo.prox = null", "cabeca.prox = novo", "novo.prox = null"],
+      [
+        { text: "ultimo.prox = null", misconception: "circular-parada" },
+        { text: "cabeca.prox = novo", misconception: "circular-religar-cabeca" },
+        { text: "novo.prox = null", misconception: "null-significado" },
+      ],
+      { id: "clist.insertHead.religa", concept: "circular.retorno", explain: "O último nó ainda aponta para a cabeça antiga; ele precisa passar a apontar para o novo nó para o círculo continuar fechado." },
     ),
   }));
   s.push(listStep({
@@ -212,7 +222,12 @@ export function cInsertTail(list: Node[], value: number): Op {
     predict: ask(
       "O novo nó ainda não aponta para ninguém. Como fechamos o círculo?",
       "novo.prox = cabeca",
-      ["novo.prox = null", "cabeca = novo", "ultimo.prox = cabeca"],
+      [
+        { text: "novo.prox = null", misconception: "circular-parada" },
+        { text: "cabeca = novo", misconception: "no-vs-ponteiro" },
+        { text: "ultimo.prox = cabeca", misconception: "circular-religar-cabeca" },
+      ],
+      { id: "clist.insertTail.fecha", concept: "circular.retorno", explain: "Numa lista circular o último nó aponta para a cabeça: o novo nó, agora o último, aponta para a cabeça e fecha o círculo." },
     ),
   }));
   return cOp("inserirFim", clistCode.insertTail, nl, s);
@@ -260,7 +275,12 @@ export function cInsertAt(list: Node[], pos: number, value: number): Op {
     predict: ask(
       "Qual ligação deve ser feita primeiro?",
       "novo.prox = atual.prox",
-      ["atual.prox = novo", "cabeca = novo", "atual = null"],
+      [
+        { text: "atual.prox = novo", misconception: "ordem-religacao-insercao" },
+        { text: "cabeca = novo", misconception: "no-vs-ponteiro" },
+        { text: "atual = null", misconception: "null-significado" },
+      ],
+      { id: "clist.insertAt.ordem", concept: "lista.religar-insercao", explain: "Primeiro o novo nó aponta para o resto (novo.prox = atual.prox); só então atual aponta para o novo, para não perder a volta do círculo." },
     ),
   }));
   s.push(listStep({
@@ -313,7 +333,12 @@ export function cRemoveAt(list: Node[], pos: number): Op {
       predict: ask(
         "A cabeça avançou, mas o último nó ainda aponta para o nó removido. O que falta?",
         "ultimo.prox passa a apontar para a nova cabeça",
-        ["nada, a lista já está correta", "novo.prox = null", "cabeca = ultimo"],
+        [
+          { text: "nada, a lista já está correta", misconception: "circular-religar-cabeca" },
+          { text: "novo.prox = null", misconception: "circular-parada" },
+          { text: "cabeca = ultimo", misconception: "no-vs-ponteiro" },
+        ],
+        { id: "clist.removeHead.religa", concept: "circular.retorno", explain: "Ao remover a cabeça, o último nó ainda aponta para o nó removido; ele precisa apontar para a nova cabeça." },
       ),
     }));
     s.push(listStep({ line: 8, nodes: rest, links: chain(m - 1, "circular"), pointers: { cabeca: 0 }, message: `Nó ${t.value} removido.` }));
@@ -335,7 +360,12 @@ export function cRemoveAt(list: Node[], pos: number): Op {
     predict: ask(
       "Como desligamos o alvo?",
       "anterior.prox = anterior.prox.prox",
-      ["alvo.prox = null apenas", "cabeca = alvo", "anterior = alvo"],
+      [
+        { text: "alvo.prox = null apenas", misconception: "ordem-religacao-remocao" },
+        { text: "cabeca = alvo", misconception: "no-vs-ponteiro" },
+        { text: "anterior = alvo", misconception: "no-vs-ponteiro" },
+      ],
+      { id: "clist.removeAt.ordem", concept: "lista.religar-remocao", explain: "O anterior salta o alvo apontando para o seguinte dele; na circular isso basta, pois o retorno à cabeça já estava correto." },
     ),
   }));
   s.push(listStep({ line: 13, nodes: rest, links: chain(m - 1, "circular"), pointers: { cabeca: 0 }, message: `Nó ${t.value} removido.` }));
@@ -406,7 +436,12 @@ export function cSearch(list: Node[], value: number): Op {
     s.push(listStep({
       line: 5, nodes: list, links: c, pointers: { cabeca: 0, atual: nxt }, highlight: [list[nxt].id], message: "Avançamos.", vars: { i: `${i + 1}` },
       predict: i === 0 && m > 1
-        ? ask(`${list[i].value} é diferente de ${value}. E agora?`, "atual avança para o próximo nó", ["Retorna -1", "Retorna 0", "Remove o nó"])
+        ? ask(
+            `${list[i].value} é diferente de ${value}. E agora?`,
+            "atual avança para o próximo nó",
+            ["Retorna -1", "Retorna 0", { text: "Remove o nó", misconception: "no-vs-ponteiro" }],
+            { id: "clist.search.percurso", concept: "lista.percurso", explain: "A busca segue avançando pelo círculo; só termina ao voltar à cabeça." },
+          )
         : undefined,
     }));
     s.push(listStep({
@@ -419,7 +454,12 @@ export function cSearch(list: Node[], value: number): Op {
         ? ask(
             "atual voltou à cabeça. O que acontece com o laço?",
             "O laço termina: já percorremos todo o círculo",
-            ["O laço continua girando", "Retorna 0", "atual vira null"],
+            [
+              { text: "O laço continua girando", misconception: "circular-parada" },
+              "Retorna 0",
+              { text: "atual vira null", misconception: "circular-parada" },
+            ],
+            { id: "clist.search.volta", concept: "circular.parada", explain: "Quando atual volta a ser a cabeça, demos a volta completa: o laço para e a busca devolve -1." },
           )
         : undefined,
     }));

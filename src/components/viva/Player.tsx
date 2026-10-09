@@ -26,12 +26,15 @@ export function Controls({ p }: { p: PlayerApi }) {
       <div className={styles.predictToggle}>
         <Switch checked={p.predictMode} onCheckedChange={p.setPredictMode} label="Modo previsão" />
       </div>
+      <div className={styles.predictToggle}>
+        <Switch checked={p.confidenceMode} onCheckedChange={p.setConfidenceMode} label="Pedir confiança" />
+      </div>
       <span className={styles.monoMuted}>acertos {p.score.ok}/{p.score.total}</span>
     </div>
   );
 }
 
-export function CodePanel({ p }: { p: PlayerApi }) {
+export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boolean }) {
   const [lang, setLang] = useState<CodeLang>("humano");
   const idlePlaceholder =
     lang === "humano"
@@ -73,7 +76,7 @@ export function CodePanel({ p }: { p: PlayerApi }) {
           );
         })}
       </pre>
-      {p.step && Object.keys(p.step.vars).length > 0 && (
+      {showVars && p.step && Object.keys(p.step.vars).length > 0 && (
         <div className={styles.vars}>
           <div className={styles.varsHead}>variáveis</div>
           {Object.entries(p.step.vars).map(([k, v]) => (
@@ -87,32 +90,63 @@ export function CodePanel({ p }: { p: PlayerApi }) {
   );
 }
 
+import { misconception } from "../../content/misconceptions";
+
+const CONFIDENCE_LEVELS: { level: 0 | 1 | 2; label: string }[] = [
+  { level: 0, label: "Chute" },
+  { level: 1, label: "Acho que sei" },
+  { level: 2, label: "Tenho certeza" },
+];
+
 export function PredictBox({ p }: { p: PlayerApi }) {
   if (p.asking === null || !p.op) return null;
   const q = p.op.steps[p.asking].predict!;
   const chosen = p.answered[p.asking];
   const done = chosen !== undefined;
+  const correct = done && chosen === q.answer;
+  const chosenMiscon = done && !correct ? q.misconceptions?.[chosen] : undefined;
+  const askingConfidence = p.needsConfidence;
+
   return (
     <div className={styles.predict} role="dialog" aria-label="Preveja o próximo passo">
       <div className={styles.predictKicker}>Preveja o próximo passo</div>
       <div className={styles.predictQ}>{q.question}</div>
-      <div className={styles.predictOpts}>
-        {q.options.map((o, i) => {
-          const state = !done ? "" : i === q.answer ? styles.optOk : i === chosen ? styles.optBad : styles.optDim;
-          return (
-            <button key={i} type="button" disabled={done} onClick={() => p.answer(i)} className={`${styles.opt} ${state}`}>
-              {o}
-            </button>
-          );
-        })}
-      </div>
-      {done && (
-        <div className={styles.predictFoot} aria-live="polite">
-          <span className={chosen === q.answer ? styles.textOk : styles.textBad}>
-            {chosen === q.answer ? "Correto!" : "Não exatamente — veja o que acontece."}
-          </span>
-          <Button size="sm" onClick={p.continueAfter}>Continuar</Button>
+
+      {askingConfidence ? (
+        <div className={styles.confidence}>
+          <span className={styles.confidenceLabel}>Antes de responder: o quanto você tem certeza?</span>
+          <div className={styles.confidenceOpts} role="group" aria-label="Nível de confiança">
+            {CONFIDENCE_LEVELS.map((c) => (
+              <button key={c.level} type="button" className={styles.confidenceBtn} onClick={() => p.setConfidence(c.level)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
         </div>
+      ) : (
+        <>
+          <div className={styles.predictOpts}>
+            {q.options.map((o, i) => {
+              const state = !done ? "" : i === q.answer ? styles.optOk : i === chosen ? styles.optBad : styles.optDim;
+              return (
+                <button key={i} type="button" disabled={done} onClick={() => p.answer(i)} className={`${styles.opt} ${state}`}>
+                  {o}
+                </button>
+              );
+            })}
+          </div>
+          {done && (
+            <div className={styles.predictFoot} aria-live="polite">
+              <p className={styles.predictVerdict}>
+                <strong className={correct ? styles.textOk : styles.textBad}>
+                  {correct ? "Correto." : "Não exatamente."}
+                </strong>{" "}
+                {chosenMiscon ? misconception(chosenMiscon).explain : q.explain ?? "Veja o que acontece no desenho."}
+              </p>
+              <Button size="sm" onClick={p.continueAfter}>Continuar</Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import {
   initialPlayerState,
   isBusy,
   isCorrectAnswer,
+  needsConfidence,
   playerReducer,
   shouldFireDone,
   type PlayerAction,
@@ -150,6 +151,50 @@ describe("playerReducer", () => {
     expect(s.speed).toBe(300);
     expect(s.playing).toBe(true);
     expect(s.idx).toBe(0);
+  });
+});
+
+describe("confiança", () => {
+  const withConfidence = () => run(atQuestion(), { type: "SET_CONFIDENCE_MODE", on: true });
+
+  it("sem o modo ligado, needsConfidence é falso e responder funciona direto", () => {
+    const q = atQuestion();
+    expect(needsConfidence(q)).toBe(false);
+    const s = run(q, { type: "ANSWER", choice: correctChoice(q) });
+    expect(s.answered[PRED_STEP]).toBe(correctChoice(q));
+  });
+
+  it("com o modo ligado, exige o nível antes de responder", () => {
+    const q = withConfidence();
+    expect(needsConfidence(q)).toBe(true);
+    // ANSWER é bloqueado enquanto não há confiança declarada
+    const blocked = run(q, { type: "ANSWER", choice: correctChoice(q) });
+    expect(blocked.answered[PRED_STEP]).toBeUndefined();
+    expect(blocked.score.total).toBe(0);
+    // declara a confiança e aí sim responde
+    const s = run(q, { type: "SET_CONFIDENCE", level: 2 }, { type: "ANSWER", choice: correctChoice(q) });
+    expect(needsConfidence(run(q, { type: "SET_CONFIDENCE", level: 2 }))).toBe(false);
+    expect(s.confidence[PRED_STEP]).toBe(2);
+    expect(s.answered[PRED_STEP]).toBe(correctChoice(q));
+  });
+
+  it("a confiança não pode ser trocada depois de declarada nem depois de responder", () => {
+    const q = run(withConfidence(), { type: "SET_CONFIDENCE", level: 0 });
+    expect(run(q, { type: "SET_CONFIDENCE", level: 2 }).confidence[PRED_STEP]).toBe(0);
+    const answered = run(q, { type: "ANSWER", choice: correctChoice(q) });
+    expect(run(answered, { type: "SET_CONFIDENCE", level: 1 }).confidence[PRED_STEP]).toBe(0);
+  });
+
+  it("START limpa as confianças da operação anterior", () => {
+    const q = run(withConfidence(), { type: "SET_CONFIDENCE", level: 1 });
+    const again = run(q, { type: "START", op: pushOp() });
+    expect(again.confidence).toEqual({});
+    expect(again.confidenceMode).toBe(true); // o modo em si permanece
+  });
+
+  it("sem pergunta aberta, SET_CONFIDENCE não faz nada", () => {
+    const s = run(initialPlayerState, { type: "SET_CONFIDENCE_MODE", on: true }, { type: "SET_CONFIDENCE", level: 2 });
+    expect(s.confidence).toEqual({});
   });
 });
 

@@ -36,7 +36,11 @@ export function LabPage() {
     void syncProgressToApi(op.structure, label);
   }, []);
   const onPredict = useCallback((e: PredictEvent) => {
-    recordPrediction(e.op.structure, e.op.name, e.correct, e.op.variant);
+    recordPrediction(e.op.structure, e.op.name, e.correct, e.op.variant, {
+      concept: e.concept,
+      misconception: e.misconception,
+      confidence: e.confidence,
+    });
   }, []);
 
   const switchTab = (t: Tab, syncHash = true) => {

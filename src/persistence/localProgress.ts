@@ -104,7 +104,8 @@ export function recordPrediction(
   structure: string,
   operation: string,
   isCorrect: boolean,
-  variant?: EventVariant
+  variant?: EventVariant,
+  extra: { concept?: string; misconception?: string; confidence?: 0 | 1 | 2 } = {}
 ): void {
   logEvent({
     approach: "ativa",
@@ -115,5 +116,8 @@ export function recordPrediction(
     variant,
     operation,
     correct: isCorrect,
+    concept: extra.concept,
+    misconception: extra.misconception,
+    confidence: extra.confidence,
   });
 }
