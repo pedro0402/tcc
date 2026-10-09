@@ -2,6 +2,8 @@ import { useEffect, useReducer } from "react";
 import type { Op, Step } from "../../engine/viva/engine";
 import {
   canAnswer,
+  canAnswerDo,
+  doStepAt,
   initialPlayerState,
   isBusy,
   isCorrectAnswer,
@@ -12,6 +14,7 @@ import {
 
 import type { ConceptId } from "../../engine/viva/engine";
 import type { MisconceptionId } from "../../content/misconceptions";
+import { deriveDoSteps, type DoStep } from "../../engine/viva/doStage";
 
 export interface PredictEvent {
   op: Op;
@@ -28,20 +31,36 @@ export interface PredictEvent {
   confidence?: 0 | 1 | 2;
 }
 
+export interface DoEvent {
+  op: Op;
+  stepIndex: number;
+  pointer: string;
+  correct: boolean;
+}
+
 interface PlayerCallbacks {
   onDone: (op: Op) => void;
   onPredict?: (event: PredictEvent) => void;
+  onDo?: (event: DoEvent) => void;
 }
 
 /** Player do EstruturaViva: reprodução, modo previsão e placar. */
-export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
+export function usePlayer({ onDone, onPredict, onDo }: PlayerCallbacks) {
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
-  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence } = state;
+  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence, doMode, doAsking, doAnswered } = state;
 
   const start = (o: Op, opts: { autoPlay?: boolean } = {}) =>
-    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay });
+    // As perguntas do estágio Fazer são derivadas da operação no momento de iniciar.
+    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay, doSteps: deriveDoSteps(o) });
 
   const next = () => dispatch({ type: "NEXT" });
+
+  const answerDo = (nodeId: number | null) => {
+    if (!canAnswerDo(state) || !op || doAsking === null) return;
+    const step = doStepAt(state, doAsking);
+    dispatch({ type: "ANSWER_DO", nodeId });
+    if (step) onDo?.({ op, stepIndex: doAsking, pointer: step.pointer, correct: step.answerId === nodeId });
+  };
 
   const answer = (choice: number) => {
     if (!canAnswer(state) || needsConfidence(state) || !op || asking === null) return;
@@ -64,7 +83,7 @@ export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
     if (!playing) return;
     const t = window.setTimeout(() => dispatch({ type: "NEXT" }), speed);
     return () => window.clearTimeout(t);
-  }, [playing, speed, idx, asking, op, predictMode, answered]);
+  }, [playing, speed, idx, asking, doAsking, op, predictMode, doMode, answered, doAnswered]);
 
   // Avisa o fim da operação uma única vez (o reducer marca `finished`).
   useEffect(() => {
@@ -91,6 +110,13 @@ export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
     confidence,
     setConfidence: (level: 0 | 1 | 2) => dispatch({ type: "SET_CONFIDENCE", level }),
     needsConfidence: needsConfidence(state),
+    doMode,
+    setDoMode: (on: boolean) => dispatch({ type: "SET_DO_MODE", on }),
+    doAsking,
+    doAnswered,
+    doStep: doAsking !== null ? doStepAt(state, doAsking) : undefined,
+    answerDo,
+    continueAfterDo: () => dispatch({ type: "CONTINUE_DO" }),
     asking,
     answered,
     answer,

@@ -19,7 +19,7 @@ import {
 } from "../../engine/viva/scaffold";
 import { makeChallenge, matchesTarget, type Challenge } from "../../engine/viva/challenge";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
-import { CodePanel, Controls, PredictBox } from "../viva/Player";
+import { CodePanel, Controls, DoBox, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
 import { Button, Input } from "../viva/ui";
 import styles from "../viva/viva.module.css";
@@ -132,12 +132,17 @@ export function LabWorkspace({
     // Cada previsão respondida alimenta a escada (acerto limpo sobe; erro desce).
     setScaffold((s) => applyAttempt(s, { correct: e.correct }));
   }, []);
-  const p = usePlayer({ onDone: handleDone, onPredict: handlePredict });
+  const handleDo = useCallback((e: { correct: boolean }) => {
+    setScaffold((s) => applyAttempt(s, { correct: e.correct }));
+  }, []);
+  const p = usePlayer({ onDone: handleDone, onPredict: handlePredict, onDo: handleDo });
 
-  // O estágio define o apoio: Observar sem previsões; Prever e Fazer com previsões.
+  // O estágio define o apoio: Observar sem perguntas; Prever com previsão;
+  // Fazer com perguntas de ponteiro (clicar no nó); Desafio sem passos guiados.
   const stage = scaffold.stage;
   useEffect(() => {
-    p.setPredictMode(stage === "prever" || stage === "fazer");
+    p.setPredictMode(stage === "prever");
+    p.setDoMode(stage === "fazer");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
@@ -336,9 +341,14 @@ export function LabWorkspace({
           {step?.message}
         </div>
         <div className={styles.stage}>
-          {isList ? <ListCanvas step={step} kind={kind} /> : <StackCanvas step={step} />}
+          {isList ? (
+            <ListCanvas step={step} kind={kind} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
+          ) : (
+            <StackCanvas step={step} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
+          )}
         </div>
         <PredictBox p={p} />
+        <DoBox p={p} />
         {explained && (
           <SelfExplainBox
             key={`${explained.name}-${explained.final.length}`}

@@ -91,6 +91,44 @@ export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boo
 }
 
 import { misconception } from "../../content/misconceptions";
+import { doAnswerText } from "../../engine/viva/doStage";
+
+/**
+ * Estágio Fazer: pede ao aluno que aponte o destino de um ponteiro clicando
+ * num nó do desenho (ou no botão "null"). Mostra a pergunta e, após responder,
+ * se acertou e qual era o destino certo.
+ */
+export function DoBox({ p }: { p: PlayerApi }) {
+  if (p.doAsking === null || !p.op || !p.doStep) return null;
+  const step = p.doStep;
+  const chosen = p.doAnswered[p.doAsking];
+  const done = chosen !== undefined;
+  const correct = done && chosen === step.answerId;
+  const answerText = doAnswerText(p.op, step);
+
+  return (
+    <div className={styles.predict} role="dialog" aria-label="Aponte o ponteiro">
+      <div className={styles.predictKicker}>Sua vez — aponte o ponteiro</div>
+      <div className={styles.predictQ}>{step.question} Clique no nó de destino no desenho.</div>
+      <div className={styles.doActions}>
+        <Button size="sm" variant="outline" disabled={done} onClick={() => p.answerDo(null)}>
+          Aponta para null
+        </Button>
+      </div>
+      {done && (
+        <div className={styles.predictFoot} aria-live="polite">
+          <p className={styles.predictVerdict}>
+            <strong className={correct ? styles.textOk : styles.textBad}>
+              {correct ? "Correto." : "Não exatamente."}
+            </strong>{" "}
+            {correct ? `"${step.pointer}" aponta para ${answerText}.` : `"${step.pointer}" deveria apontar para ${answerText}.`}
+          </p>
+          <Button size="sm" onClick={p.continueAfterDo}>Continuar</Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CONFIDENCE_LEVELS: { level: 0 | 1 | 2; label: string }[] = [
   { level: 0, label: "Chute" },

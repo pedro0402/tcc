@@ -11,6 +11,7 @@ import {
   type PlayerAction,
   type PlayerState,
 } from "./playerReducer";
+import { deriveDoSteps } from "../../engine/viva/doStage";
 
 // push em pilha com 1 elemento: 5 passos, previsão revelada no passo 3.
 const pushOp = () => E.stackPush([E.mk(1)], 2);
@@ -195,6 +196,75 @@ describe("confiança", () => {
   it("sem pergunta aberta, SET_CONFIDENCE não faz nada", () => {
     const s = run(initialPlayerState, { type: "SET_CONFIDENCE_MODE", on: true }, { type: "SET_CONFIDENCE", level: 2 });
     expect(s.confidence).toEqual({});
+  });
+});
+
+describe("estágio Fazer (pick-pointer)", () => {
+  // Deriva as perguntas de ponteiro reais do push e inicia no modo Fazer.
+  const startDo = () => {
+    const op = pushOp();
+    const doSteps = deriveDoSteps(op);
+    const s = run({ ...initialPlayerState, doMode: true }, { type: "START", op, doSteps, autoPlay: false });
+    return { s, doSteps };
+  };
+
+  it("deriva perguntas e abre a primeira ao avançar", () => {
+    const { s, doSteps } = startDo();
+    expect(doSteps.length).toBeGreaterThan(0);
+    const firstStep = doSteps[0].stepIndex;
+    let st = s;
+    for (let i = 0; i < firstStep; i++) st = run(st, { type: "NEXT" });
+    const asked = run(st, { type: "NEXT" });
+    expect(asked.doAsking).toBe(firstStep);
+    expect(asked.idx).toBe(firstStep - 1); // o passo da pergunta ainda não foi mostrado
+    expect(asked.playing).toBe(false);
+  });
+
+  it("resposta certa soma acerto; errada soma só o total", () => {
+    const { s, doSteps } = startDo();
+    const d = doSteps[0];
+    let st = s;
+    while (st.doAsking === null) st = run(st, { type: "NEXT" });
+    const right = run(st, { type: "ANSWER_DO", nodeId: d.answerId });
+    expect(right.score).toEqual({ ok: 1, total: 1 });
+    const wrong = run(st, { type: "ANSWER_DO", nodeId: -999 });
+    expect(wrong.score).toEqual({ ok: 0, total: 1 });
+  });
+
+  it("segunda resposta à mesma pergunta é ignorada", () => {
+    const { s, doSteps } = startDo();
+    let st = s;
+    while (st.doAsking === null) st = run(st, { type: "NEXT" });
+    const once = run(st, { type: "ANSWER_DO", nodeId: doSteps[0].answerId });
+    const twice = run(once, { type: "ANSWER_DO", nodeId: -1 });
+    expect(twice).toBe(once);
+  });
+
+  it("CONTINUE_DO revela o passo e retoma", () => {
+    const { s } = startDo();
+    let st = s;
+    while (st.doAsking === null) st = run(st, { type: "NEXT" });
+    const asking = st.doAsking!;
+    st = run(st, { type: "ANSWER_DO", nodeId: 0 }, { type: "CONTINUE_DO" });
+    expect(st.idx).toBe(asking);
+    expect(st.doAsking).toBeNull();
+    expect(st.playing).toBe(true);
+  });
+
+  it("sem o modo Fazer, as perguntas de ponteiro não abrem", () => {
+    const op = pushOp();
+    let st = run(initialPlayerState, { type: "START", op, doSteps: deriveDoSteps(op), autoPlay: false, });
+    for (let i = 0; i < op.steps.length; i++) st = run(st, { type: "NEXT" });
+    expect(st.doAsking).toBeNull();
+  });
+
+  it("SKIP fecha a pergunta de ponteiro", () => {
+    const { s } = startDo();
+    let st = s;
+    while (st.doAsking === null) st = run(st, { type: "NEXT" });
+    st = run(st, { type: "SKIP" });
+    expect(st.doAsking).toBeNull();
+    expect(st.idx).toBe(st.op!.steps.length - 1);
   });
 });
 

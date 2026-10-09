@@ -733,6 +733,32 @@
   border-color: var(--ev-primary);
 }
 
+.doActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.nodePick {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+}
+
+.cell.nodePick {
+  width: 100%;
+}
+
+.nodePick:hover {
+  border-color: var(--ev-accent) !important;
+}
+
+.nodePick:focus-visible {
+  outline: 2px solid var(--ev-primary);
+  outline-offset: 2px;
+}
+
 .detailRow {
   display: flex;
   gap: 8px;

@@ -8,10 +8,18 @@ function pointersFor(step: Step, i: number) {
   return Object.entries(step.pointers).filter(([, v]) => v === i).map(([k]) => k);
 }
 
-function Box({ n, step, idx }: { n: Node; step: Step; idx: number }) {
+/** Quando `onPick` existe, o nó vira um botão clicável (estágio Fazer). */
+function Box({ n, step, idx, onPick }: { n: Node; step: Step; idx: number; onPick?: (nodeId: number) => void }) {
   const hl = step.highlight.includes(n.id);
   const rm = step.removing === n.id;
   const ptrs = pointersFor(step, idx);
+  const cls = rm ? styles.nodeRm : hl ? styles.nodeHl : styles.node;
+  const inner = (
+    <>
+      <span className={styles.nodeVal}>{n.value}</span>
+      <span className={styles.nodeNext}>•</span>
+    </>
+  );
   return (
     <div className={styles.boxWrap}>
       <div className={styles.ptrRow}>
@@ -19,10 +27,13 @@ function Box({ n, step, idx }: { n: Node; step: Step; idx: number }) {
           <span key={p} className={styles.ptr}>{p}</span>
         ))}
       </div>
-      <div className={rm ? styles.nodeRm : hl ? styles.nodeHl : styles.node}>
-        <span className={styles.nodeVal}>{n.value}</span>
-        <span className={styles.nodeNext}>•</span>
-      </div>
+      {onPick ? (
+        <button type="button" className={`${cls} ${styles.nodePick}`} onClick={() => onPick(n.id)} aria-label={`Escolher o nó ${n.value}`}>
+          {inner}
+        </button>
+      ) : (
+        <div className={cls}>{inner}</div>
+      )}
     </div>
   );
 }
@@ -54,7 +65,7 @@ function strayTags(links: Links, nodes: Node[], i: number, kind: ListKind): stri
   return out;
 }
 
-function LinkedList({ step, kind, links }: { step: Step; kind: ListKind; links: Links }) {
+function LinkedList({ step, kind, links, onPick }: { step: Step; kind: ListKind; links: Links; onPick?: (nodeId: number) => void }) {
   const nodes = step.nodes;
   const last = nodes.length - 1;
   const tailTarget = links.prox[last];
@@ -62,7 +73,7 @@ function LinkedList({ step, kind, links }: { step: Step; kind: ListKind; links: 
   return (
     <div
       className={`${styles.listCol} ${styles.listColLinked}`}
-      role="img"
+      role={onPick ? undefined : "img"}
       aria-label={`Lista ${kind}: ${nodes.map((n) => n.value).join(", ")}`}
     >
       <div className={styles.listRow}>
@@ -78,7 +89,7 @@ function LinkedList({ step, kind, links }: { step: Step; kind: ListKind; links: 
           return (
             <div key={n.id} className={styles.listItem}>
               <div className={styles.linkCol}>
-                <Box n={n} step={step} idx={i} />
+                <Box n={n} step={step} idx={i} onPick={onPick} />
                 {tags.length > 0 && (
                   <div className={styles.linkTags}>
                     {tags.map((t) => (
@@ -108,18 +119,18 @@ function LinkedList({ step, kind, links }: { step: Step; kind: ListKind; links: 
   );
 }
 
-export function ListCanvas({ step, kind }: { step: Step | null; kind: ListKind }) {
+export function ListCanvas({ step, kind, onPick }: { step: Step | null; kind: ListKind; onPick?: (nodeId: number) => void }) {
   if (!step) return null;
   const nodes = step.nodes;
   const arrow = kind === "dupla" ? "⇄" : "→";
   if (!nodes.length) return <Empty text="cabeca → null" />;
-  if (step.links) return <LinkedList step={step} kind={kind} links={step.links} />;
+  if (step.links) return <LinkedList step={step} kind={kind} links={step.links} onPick={onPick} />;
   return (
-    <div className={styles.listCol} role="img" aria-label={`Lista ${kind}: ${nodes.map((n) => n.value).join(", ")}`}>
+    <div className={styles.listCol} role={onPick ? undefined : "img"} aria-label={`Lista ${kind}: ${nodes.map((n) => n.value).join(", ")}`}>
       <div className={styles.listRow}>
         {nodes.map((n, i) => (
           <div key={n.id} className={styles.listItem}>
-            <Box n={n} step={step} idx={i} />
+            <Box n={n} step={step} idx={i} onPick={onPick} />
             <span className={styles.arrow}>
               {i < nodes.length - 1 ? arrow : kind === "circular" ? "↩" : "→"}
             </span>
@@ -134,22 +145,29 @@ export function ListCanvas({ step, kind }: { step: Step | null; kind: ListKind }
   );
 }
 
-export function StackCanvas({ step }: { step: Step | null }) {
+export function StackCanvas({ step, onPick }: { step: Step | null; onPick?: (nodeId: number) => void }) {
   if (!step) return null;
   const nodes = step.nodes;
   return (
-    <div className={styles.stackCol} role="img" aria-label={`Pilha, do topo para a base: ${nodes.map((n) => n.value).join(", ") || "vazia"}`}>
+    <div className={styles.stackCol} role={onPick ? undefined : "img"} aria-label={`Pilha, do topo para a base: ${nodes.map((n) => n.value).join(", ") || "vazia"}`}>
       {!nodes.length && <Empty text="topo → null" />}
       <div className={styles.stackWell}>
-        {nodes.map((n, i) => (
-          <div key={n.id} className={styles.stackRow}>
-            <span className={styles.stackPtr}>{pointersFor(step, i).join(" ")}</span>
-            <div className={step.removing === n.id ? styles.cellRm : step.highlight.includes(n.id) ? styles.cellHl : styles.cell}>
-              {n.value}
+        {nodes.map((n, i) => {
+          const cell = step.removing === n.id ? styles.cellRm : step.highlight.includes(n.id) ? styles.cellHl : styles.cell;
+          return (
+            <div key={n.id} className={styles.stackRow}>
+              <span className={styles.stackPtr}>{pointersFor(step, i).join(" ")}</span>
+              {onPick ? (
+                <button type="button" className={`${cell} ${styles.nodePick}`} onClick={() => onPick(n.id)} aria-label={`Escolher o nó ${n.value}`}>
+                  {n.value}
+                </button>
+              ) : (
+                <div className={cell}>{n.value}</div>
+              )}
+              <span className={styles.stackSpacer} />
             </div>
-            <span className={styles.stackSpacer} />
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
