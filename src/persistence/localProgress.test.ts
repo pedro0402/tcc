@@ -6,6 +6,7 @@ import {
   recordOperationComplete,
   recordPrediction,
   recordQuizAttempt,
+  recordSelfExplanation,
 } from "./localProgress";
 
 const ev = (over: Partial<LearningEvent>): LearningEvent => ({
@@ -87,5 +88,18 @@ describe("record* gravam no log de eventos", () => {
   it("estrutura desconhecida é gravada sem o campo structure", () => {
     recordOperationComplete("arvore", "inserir");
     expect(eventStore().getEvents()[0].structure).toBeUndefined();
+  });
+
+  it("autoexplicação vira evento self-explanation (sem guardar o texto no evento)", () => {
+    recordSelfExplanation("stack", "push", "o novo nó vira o topo", undefined);
+    const e = eventStore().getEvents()[0];
+    expect(e).toMatchObject({ kind: "self-explanation", structure: "stack", operation: "push", correct: true });
+    // o texto livre não vai para o evento
+    expect(JSON.stringify(e)).not.toContain("o novo nó vira o topo");
+  });
+
+  it("autoexplicação em branco registra o evento com correct=false", () => {
+    recordSelfExplanation("stack", "pop", "   ");
+    expect(eventStore().getEvents()[0]).toMatchObject({ kind: "self-explanation", correct: false });
   });
 });

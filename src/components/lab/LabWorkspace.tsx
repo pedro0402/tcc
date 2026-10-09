@@ -5,6 +5,8 @@ import type { OpId } from "../../engine/viva/opIds";
 import { listOps } from "../../engine/viva/lists";
 import { chain } from "../../engine/viva/links";
 import { nodesFromValues, nodesToText, parseInitialState } from "../../engine/viva/initialState";
+import { selfExplainFor } from "../../content/selfExplain";
+import { recordSelfExplanation } from "../../persistence/localProgress";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
@@ -54,6 +56,8 @@ export interface LabWorkspaceProps {
   allowed?: OpId[];
   /** Mostra o botão "Esvaziar estrutura". Padrão: sim. */
   allowClear?: boolean;
+  /** Oferece a autoexplicação ao fim de cada operação. Padrão: sim. */
+  selfExplain?: boolean;
   /** Chamado quando uma operação (exceto a ociosa) chega ao fim. */
   onOpDone?: (op: Op) => void;
   onPredict?: (event: PredictEvent) => void;
@@ -73,6 +77,7 @@ export function LabWorkspace({
   onNodesChange,
   allowed,
   allowClear = true,
+  selfExplain = true,
   onOpDone,
   onPredict,
   onBusyChange,
@@ -92,11 +97,16 @@ export function LabWorkspace({
   opDoneRef.current = onOpDone;
   predictRef.current = onPredict;
 
+  // Operação recém-concluída (sem erro), para oferecer a autoexplicação.
+  const [explained, setExplained] = useState<Op | null>(null);
+
   const handleDone = useCallback((op: Op) => {
     nodesChangeRef.current(op.final, op.structure);
     if (op.name === IDLE) return;
     opDoneRef.current?.(op);
-  }, []);
+    const hadError = op.steps.some((s) => s.error);
+    setExplained(selfExplain && !hadError && selfExplainFor(op.name) ? op : null);
+  }, [selfExplain]);
   const handlePredict = useCallback((e: PredictEvent) => predictRef.current?.(e), []);
   const p = usePlayer({ onDone: handleDone, onPredict: handlePredict });
 
@@ -136,16 +146,20 @@ export function LabWorkspace({
   const step = p.op ? p.step : idleStep;
 
   const run = (op: Op) => {
-    if (!p.busy) p.start(op);
+    if (p.busy) return;
+    setExplained(null);
+    p.start(op);
   };
 
   const clear = () => {
+    setExplained(null);
     onNodesChange([], structure);
     p.start(idleOp(structure, [], kind));
   };
 
   // Define o estado inicial da estrutura a partir de uma lista de valores.
   const applyInitial = (values: number[]) => {
+    setExplained(null);
     const next = nodesFromValues(values);
     onNodesChange(next, structure);
     p.start(idleOp(structure, next, kind));
@@ -232,6 +246,13 @@ export function LabWorkspace({
           {isList ? <ListCanvas step={step} kind={kind} /> : <StackCanvas step={step} />}
         </div>
         <PredictBox p={p} />
+        {explained && (
+          <SelfExplainBox
+            key={`${explained.name}-${explained.final.length}`}
+            op={explained}
+            onSubmit={(text) => recordSelfExplanation(explained.structure, explained.name, text, explained.variant)}
+          />
+        )}
         <Controls p={p} />
       </section>
 
@@ -260,6 +281,54 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
     <div>
       <div className={styles.groupTitle}>{title}</div>
       <div className={styles.groupBody}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Autoexplicação após a operação: o aluno escreve em uma frase por que aquilo
+ * aconteceu e depois compara com a explicação-modelo. É reflexão, não avaliação:
+ * a resposta é opcional e o texto fica só no navegador.
+ */
+function SelfExplainBox({ op, onSubmit }: { op: Op; onSubmit: (text: string) => void }) {
+  const prompt = selfExplainFor(op.name);
+  const [text, setText] = useState("");
+  const [done, setDone] = useState(false);
+  if (!prompt) return null;
+
+  const finish = () => {
+    onSubmit(text);
+    setDone(true);
+  };
+
+  return (
+    <div className={styles.selfExplain} aria-label="Explique com suas palavras">
+      <p className={styles.selfExplainKicker}>Explique com suas palavras</p>
+      <p className={styles.selfExplainQ}>{prompt.question}</p>
+      {!done ? (
+        <>
+          <textarea
+            className={styles.selfExplainInput}
+            value={text}
+            maxLength={240}
+            rows={2}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Opcional — uma ou duas frases."
+            aria-label="Sua explicação"
+          />
+          <div className={styles.selfExplainActions}>
+            <Button size="sm" variant="ghost" onClick={finish}>Pular</Button>
+            <Button size="sm" onClick={finish}>Comparar</Button>
+          </div>
+        </>
+      ) : (
+        <div aria-live="polite">
+          {text.trim() && <p className={styles.selfExplainMine}>Você escreveu: {text.trim()}</p>}
+          <p className={styles.selfExplainModel}>
+            <strong>Uma forma de explicar:</strong> {prompt.model}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
