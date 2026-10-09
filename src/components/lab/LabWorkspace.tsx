@@ -122,6 +122,9 @@ export function LabWorkspace({
   // Progresso visível do roteiro: "operação atual de total" e a legenda.
   const [scriptProgress, setScriptProgress] = useState<{ index: number; total: number; caption: string } | null>(null);
   const scriptTotal = useRef(0);
+  // Identifica a configuração de estágio atual. Em StrictMode o efeito monta
+  // duas vezes; timeouts de uma configuração antiga são descartados por este id.
+  const runId = useRef(0);
 
   // Estado do estágio Fazer e Desafio.
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -164,7 +167,10 @@ export function LabWorkspace({
       if (st === "observar") observeResult.current = op.final.map((n) => n.value);
       if (scriptQueue.current.length > 0) {
         const base = op.final;
-        setTimeout(() => runNextScripted(base), 600);
+        const id = runId.current;
+        setTimeout(() => {
+          if (runId.current === id) runNextScripted(base);
+        }, 600);
       } else {
         // Roteiro terminou: deixa o indicador no total e marca como concluído.
         setScriptProgress((prev) => (prev ? { ...prev, index: prev.total } : prev));
@@ -213,6 +219,11 @@ export function LabWorkspace({
   // Observar e Prever montam estados fixos e rodam roteiros; Fazer e Desafio
   // começam vazios com uma meta.
   const setupStage = useCallback((st: Stage) => {
+    const id = ++runId.current; // invalida timeouts de uma configuração anterior
+    const scheduleFirst = (base: Node[]) =>
+      setTimeout(() => {
+        if (runId.current === id) runNextScripted(base);
+      }, 700);
     setExplained(null);
     setGoalDone(false);
     setScriptProgress(null);
@@ -230,8 +241,7 @@ export function LabWorkspace({
       const initialNodes = nodesFromValues(script.initial);
       onNodesChange(initialNodes, structure);
       p.start(idleOp(structure, initialNodes, kind));
-      // começa o roteiro após montar o estado inicial
-      setTimeout(() => runNextScripted(initialNodes), 700);
+      scheduleFirst(initialNodes);
       return;
     }
     if (st === "prever") {
@@ -243,7 +253,7 @@ export function LabWorkspace({
       setDesafio(null);
       onNodesChange(baseNodes, structure);
       p.start(idleOp(structure, baseNodes, kind));
-      setTimeout(() => runNextScripted(baseNodes), 700);
+      scheduleFirst(baseNodes);
       return;
     }
     if (st === "fazer") {
