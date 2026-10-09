@@ -30,13 +30,13 @@ export function LabPage() {
     (structure === "linkedList" ? setList : setStack)(nodes);
   }, []);
   const onOpDone = useCallback((op: Op) => {
-    // Lista dupla/circular ganha o sufixo para não se misturar com a simples.
+    recordOperationComplete(op.structure, op.name, op.variant);
+    // Endpoint antigo de progresso: lista dupla/circular ganha o tipo no nome.
     const label = op.variant && op.variant !== "simples" ? `${op.name} (${op.variant})` : op.name;
-    recordOperationComplete(op.structure, label);
     void syncProgressToApi(op.structure, label);
   }, []);
   const onPredict = useCallback((e: PredictEvent) => {
-    recordPrediction(e.op.structure, e.op.name, e.correct);
+    recordPrediction(e.op.structure, e.op.name, e.correct, e.op.variant);
   }, []);
 
   const switchTab = (t: Tab, syncHash = true) => {

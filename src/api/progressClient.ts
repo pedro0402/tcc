@@ -1,6 +1,6 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
-function getToken(): string | null {
+export function getToken(): string | null {
   try {
     return localStorage.getItem("ds-visualizer-token");
   } catch {
@@ -23,6 +23,33 @@ async function postAuthed(path: string, body: unknown): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Envia um lote de eventos de aprendizagem.
+ * ok = aceito; drop = o servidor recusou o formato (não adianta repetir);
+ * retry = sem login, sem rede, sessão vencida ou erro do servidor.
+ */
+export async function postEvents(
+  events: unknown[]
+): Promise<"ok" | "retry" | "drop"> {
+  const token = getToken();
+  if (!token) return "retry";
+  try {
+    const res = await fetch(`${API_BASE}/events`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ events }),
+    });
+    if (res.ok) return "ok";
+    if (res.status === 400 || res.status === 413 || res.status === 422) return "drop";
+    return "retry";
+  } catch {
+    return "retry";
   }
 }
 

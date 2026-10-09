@@ -1,11 +1,12 @@
-import { useMemo, useState } from "react";
-import { getLocalProgress } from "../persistence/localProgress";
+import { useMemo } from "react";
+import { useLearningEvents } from "../learning/useLearningEvents";
+import { deriveProgress } from "../persistence/localProgress";
 import { hrefFor } from "../routing/useHashRoute";
 import styles from "./ProgressPage.module.css";
 
 export function ProgressPage() {
-  const [tick, setTick] = useState(0);
-  const progress = useMemo(() => getLocalProgress(), [tick]);
+  const events = useLearningEvents();
+  const progress = useMemo(() => deriveProgress(events), [events]);
 
   const quizTotal = progress.quizAttempts.length;
   const quizOk = progress.quizAttempts.filter((q) => q.isCorrect).length;
@@ -70,13 +71,6 @@ export function ProgressPage() {
             ))}
           </ol>
         )}
-        <button
-          type="button"
-          className={styles.refresh}
-          onClick={() => setTick((n) => n + 1)}
-        >
-          atualizar
-        </button>
       </section>
     </div>
   );

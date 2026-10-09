@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { login, register } from "../../api/progressClient";
+import { handleLogin } from "../../learning/bootstrap";
 import styles from "./AuthBar.module.css";
 
 export function AuthBar() {
@@ -52,6 +53,7 @@ export function AuthBar() {
         type="button"
         onClick={async () => {
           const ok = await login(email, password);
+          if (ok) handleLogin();
           setLoggedIn(ok);
           setMessage(ok ? "Login ok." : "Falha no login (API offline ou credenciais).");
         }}
