@@ -1,95 +1,86 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer } from "react";
 import type { Op, Step } from "../../engine/viva/engine";
+import {
+  canAnswer,
+  initialPlayerState,
+  isBusy,
+  isCorrectAnswer,
+  playerReducer,
+  shouldFireDone,
+} from "./playerReducer";
+
+export interface PredictEvent {
+  op: Op;
+  /** Índice do passo que a previsão revela. */
+  stepIndex: number;
+  chosen: number;
+  correct: boolean;
+}
 
 interface PlayerCallbacks {
   onDone: (op: Op) => void;
-  onPredict?: (op: Op, correct: boolean) => void;
+  onPredict?: (event: PredictEvent) => void;
 }
 
 /** Player do EstruturaViva: reprodução, modo previsão e placar. */
 export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
-  const [op, setOp] = useState<Op | null>(null);
-  const [idx, setIdx] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(900);
-  const [predictMode, setPredictMode] = useState(true);
-  const [asking, setAsking] = useState<number | null>(null);
-  const [answered, setAnswered] = useState<Record<number, number>>({});
-  const [score, setScore] = useState({ ok: 0, total: 0 });
-  // Depois que a operação chega ao fim o estado já foi aplicado; voltar passos
-  // é só revisão e não deve travar os botões de operação.
-  const [finished, setFinished] = useState(false);
-  const doneRef = useRef(false);
+  const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
+  const { op, idx, playing, speed, predictMode, asking, answered, score } = state;
 
-  const start = (o: Op, opts: { autoPlay?: boolean } = {}) => {
-    setOp(o);
-    setIdx(0);
-    setAnswered({});
-    setAsking(null);
-    setFinished(false);
-    doneRef.current = false;
-    setPlaying(opts.autoPlay ?? true);
-  };
+  const start = (o: Op, opts: { autoPlay?: boolean } = {}) =>
+    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay });
 
-  const next = () => {
-    if (!op || asking !== null) return;
-    const n = idx + 1;
-    if (n >= op.steps.length) {
-      setPlaying(false);
-      return;
-    }
-    if (predictMode && op.steps[n].predict && answered[n] === undefined) {
-      setAsking(n);
-      setPlaying(false);
-      return;
-    }
-    setIdx(n);
-  };
+  const next = () => dispatch({ type: "NEXT" });
 
   const answer = (choice: number) => {
-    if (asking === null || !op || answered[asking] !== undefined) return;
-    const correct = op.steps[asking].predict!.answer === choice;
-    setAnswered((a) => ({ ...a, [asking]: choice }));
-    setScore((s) => ({ ok: s.ok + (correct ? 1 : 0), total: s.total + 1 }));
-    onPredict?.(op, correct);
+    if (!canAnswer(state) || !op || asking === null) return;
+    dispatch({ type: "ANSWER", choice });
+    onPredict?.({
+      op,
+      stepIndex: asking,
+      chosen: choice,
+      correct: isCorrectAnswer(state, choice),
+    });
   };
 
-  const continueAfter = () => {
-    if (asking === null) return;
-    setIdx(asking);
-    setAsking(null);
-    setPlaying(true);
-  };
-
+  // Relógio da reprodução automática.
   useEffect(() => {
     if (!playing) return;
-    const t = window.setTimeout(next, speed);
+    const t = window.setTimeout(() => dispatch({ type: "NEXT" }), speed);
     return () => window.clearTimeout(t);
-  });
+  }, [playing, speed, idx, asking, op, predictMode, answered]);
 
+  // Avisa o fim da operação uma única vez (o reducer marca `finished`).
   useEffect(() => {
-    if (op && idx === op.steps.length - 1 && !doneRef.current) {
-      doneRef.current = true;
-      setFinished(true);
-      setPlaying(false);
+    if (op && shouldFireDone(state)) {
+      dispatch({ type: "DONE" });
       onDone(op);
     }
-  }, [op, idx, onDone]);
-
-  const skip = () => {
-    if (!op) return;
-    setAsking(null);
-    setIdx(op.steps.length - 1);
-    setPlaying(false);
-  };
+  }, [op, idx, state, onDone]);
 
   const step: Step | null = op ? op.steps[idx] : null;
-  const busy = !!op && !finished;
+
   return {
-    op, idx, step, playing, setPlaying, speed, setSpeed, predictMode, setPredictMode,
-    asking, answered, answer, continueAfter, score, start, next, skip, busy,
-    prev: () => { setPlaying(false); setAsking(null); setIdx((i) => Math.max(0, i - 1)); },
-    restart: () => { setIdx(0); setAsking(null); setPlaying(false); },
+    op,
+    idx,
+    step,
+    playing,
+    setPlaying: (v: boolean) => dispatch({ type: "SET_PLAYING", playing: v }),
+    speed,
+    setSpeed: (v: number) => dispatch({ type: "SET_SPEED", speed: v }),
+    predictMode,
+    setPredictMode: (on: boolean) => dispatch({ type: "SET_PREDICT_MODE", on }),
+    asking,
+    answered,
+    answer,
+    continueAfter: () => dispatch({ type: "CONTINUE" }),
+    score,
+    start,
+    next,
+    skip: () => dispatch({ type: "SKIP" }),
+    busy: isBusy(state),
+    prev: () => dispatch({ type: "PREV" }),
+    restart: () => dispatch({ type: "RESTART" }),
   };
 }
 

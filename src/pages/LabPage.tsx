@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import * as E from "../engine/viva/engine";
 import type { Node, Op } from "../engine/viva/engine";
-import { usePlayer } from "../components/viva/usePlayer";
+import { usePlayer, type PredictEvent } from "../components/viva/usePlayer";
 import { CodePanel, Controls, PredictBox } from "../components/viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../components/viva/Canvas";
 import { Button, Input } from "../components/viva/ui";
@@ -42,8 +42,8 @@ export function LabPage() {
     recordOperationComplete(op.structure, op.name);
     void syncProgressToApi(op.structure, op.name);
   }, []);
-  const onPredict = useCallback((op: Op, correct: boolean) => {
-    recordPrediction(op.structure, op.name, correct);
+  const onPredict = useCallback((e: PredictEvent) => {
+    recordPrediction(e.op.structure, e.op.name, e.correct);
   }, []);
   const p = usePlayer({ onDone, onPredict });
 
