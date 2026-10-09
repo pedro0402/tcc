@@ -136,6 +136,20 @@ const CONFIDENCE_LEVELS: { level: 0 | 1 | 2; label: string }[] = [
   { level: 2, label: "Tenho certeza" },
 ];
 
+/** Modo Exemplo: pausa a demonstração num passo-chave com um comentário. */
+export function ExampleBox({ p }: { p: PlayerApi }) {
+  if (p.examplePaused === null || !p.exampleNote) return null;
+  return (
+    <div className={styles.predict} role="dialog" aria-label="Exemplo comentado">
+      <div className={styles.predictKicker}>Exemplo comentado</div>
+      <p className={styles.predictVerdict}>{p.exampleNote}</p>
+      <div className={styles.predictFoot}>
+        <Button size="sm" onClick={p.continueExample}>Entendi</Button>
+      </div>
+    </div>
+  );
+}
+
 export function PredictBox({ p }: { p: PlayerApi }) {
   if (p.asking === null || !p.op) return null;
   const q = p.op.steps[p.asking].predict!;

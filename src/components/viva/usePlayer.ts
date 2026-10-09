@@ -47,11 +47,11 @@ interface PlayerCallbacks {
 /** Player do EstruturaViva: reprodução, modo previsão e placar. */
 export function usePlayer({ onDone, onPredict, onDo }: PlayerCallbacks) {
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
-  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence, doMode, doAsking, doAnswered } = state;
+  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence, doMode, doAsking, doAnswered, exampleMode, examplePaused, exampleStops } = state;
 
-  const start = (o: Op, opts: { autoPlay?: boolean } = {}) =>
+  const start = (o: Op, opts: { autoPlay?: boolean; exampleStops?: Record<number, string> } = {}) =>
     // As perguntas do estágio Fazer são derivadas da operação no momento de iniciar.
-    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay, doSteps: deriveDoSteps(o) });
+    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay, doSteps: deriveDoSteps(o), exampleStops: opts.exampleStops });
 
   const next = () => dispatch({ type: "NEXT" });
 
@@ -83,7 +83,7 @@ export function usePlayer({ onDone, onPredict, onDo }: PlayerCallbacks) {
     if (!playing) return;
     const t = window.setTimeout(() => dispatch({ type: "NEXT" }), speed);
     return () => window.clearTimeout(t);
-  }, [playing, speed, idx, asking, doAsking, op, predictMode, doMode, answered, doAnswered]);
+  }, [playing, speed, idx, asking, doAsking, examplePaused, op, predictMode, doMode, exampleMode, answered, doAnswered]);
 
   // Avisa o fim da operação uma única vez (o reducer marca `finished`).
   useEffect(() => {
@@ -112,6 +112,11 @@ export function usePlayer({ onDone, onPredict, onDo }: PlayerCallbacks) {
     needsConfidence: needsConfidence(state),
     doMode,
     setDoMode: (on: boolean) => dispatch({ type: "SET_DO_MODE", on }),
+    exampleMode,
+    setExampleMode: (on: boolean) => dispatch({ type: "SET_EXAMPLE_MODE", on }),
+    examplePaused,
+    exampleNote: examplePaused !== null ? exampleStops[examplePaused] : undefined,
+    continueExample: () => dispatch({ type: "CONTINUE_EXAMPLE" }),
     doAsking,
     doAnswered,
     doStep: doAsking !== null ? doStepAt(state, doAsking) : undefined,

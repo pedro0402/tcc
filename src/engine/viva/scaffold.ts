@@ -20,7 +20,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 export const STAGE_HINT: Record<Stage, string> = {
-  observar: "Veja a operação do começo ao fim, sem perguntas.",
+  observar: "Veja a operação com comentários nos passos-chave, sem perguntas.",
   prever: "Antes dos passos-chave, preveja o que vem a seguir.",
   fazer: "Agora é você: aponte para onde cada ponteiro vai.",
   desafio: "Só a meta é dada. Resolva sem dicas passo a passo.",

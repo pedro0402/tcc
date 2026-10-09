@@ -268,6 +268,58 @@ describe("estágio Fazer (pick-pointer)", () => {
   });
 });
 
+describe("modo Exemplo (demonstração comentada)", () => {
+  // push com paradas comentadas nos passos 2 e 3.
+  const startExample = () =>
+    run({ ...initialPlayerState, exampleMode: true }, {
+      type: "START",
+      op: pushOp(),
+      autoPlay: false,
+      exampleStops: { 2: "comentário do passo 2", 3: "comentário do passo 3" },
+    });
+
+  it("pausa ao chegar no primeiro passo-chave", () => {
+    let st = startExample();
+    st = run(st, { type: "NEXT" }); // idx 1, não é parada
+    expect(st.examplePaused).toBeNull();
+    st = run(st, { type: "NEXT" }); // idx 2, parada
+    expect(st.examplePaused).toBe(2);
+    expect(st.idx).toBe(2);
+    expect(st.playing).toBe(false);
+  });
+
+  it("NEXT é ignorado enquanto pausado; CONTINUE_EXAMPLE retoma", () => {
+    let st = run(startExample(), { type: "NEXT" }, { type: "NEXT" }); // pausa no 2
+    const paused = st;
+    expect(run(paused, { type: "NEXT" })).toBe(paused); // ignorado
+    st = run(paused, { type: "CONTINUE_EXAMPLE" });
+    expect(st.examplePaused).toBeNull();
+    expect(st.playing).toBe(true);
+  });
+
+  it("não pausa duas vezes no mesmo passo-chave", () => {
+    let st = run(startExample(), { type: "NEXT" }, { type: "NEXT" }, { type: "CONTINUE_EXAMPLE" });
+    // volta e avança de novo: o passo 2 já foi comentado, não pausa de novo
+    st = run(st, { type: "PREV" }, { type: "NEXT" });
+    expect(st.examplePaused).toBeNull();
+    expect(st.idx).toBe(2);
+  });
+
+  it("RESTART faz os passos-chave comentarem de novo", () => {
+    let st = run(startExample(), { type: "NEXT" }, { type: "NEXT" }, { type: "CONTINUE_EXAMPLE" });
+    st = run(st, { type: "RESTART" });
+    expect(st.exampleSeen).toEqual({});
+    st = run(st, { type: "NEXT" }, { type: "NEXT" });
+    expect(st.examplePaused).toBe(2);
+  });
+
+  it("sem o modo Exemplo, não pausa nos passos-chave", () => {
+    let st = run(initialPlayerState, { type: "START", op: pushOp(), autoPlay: false, exampleStops: { 2: "x" } });
+    st = run(st, { type: "NEXT" }, { type: "NEXT" });
+    expect(st.examplePaused).toBeNull();
+  });
+});
+
 describe("fim da operação", () => {
   it("shouldFireDone só no último passo e uma única vez", () => {
     let s = started();

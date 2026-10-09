@@ -18,8 +18,9 @@ import {
   type ScaffoldState,
 } from "../../engine/viva/scaffold";
 import { makeChallenge, matchesTarget, type Challenge } from "../../engine/viva/challenge";
+import { hasWorkedExample, keyStepsFor } from "../../content/workedExamples";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
-import { CodePanel, Controls, DoBox, PredictBox } from "../viva/Player";
+import { CodePanel, Controls, DoBox, ExampleBox, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
 import { Button, Input } from "../viva/ui";
 import styles from "../viva/viva.module.css";
@@ -143,6 +144,8 @@ export function LabWorkspace({
   useEffect(() => {
     p.setPredictMode(stage === "prever");
     p.setDoMode(stage === "fazer");
+    // No Observar, a operação vira um exemplo resolvido: pausa nos passos-chave.
+    p.setExampleMode(stage === "observar");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
@@ -207,6 +210,13 @@ export function LabWorkspace({
   const run = (op: Op) => {
     if (p.busy) return;
     setExplained(null);
+    // No estágio Observar, roda como exemplo resolvido: pausa comentada nos passos-chave.
+    if (stage === "observar" && hasWorkedExample(op)) {
+      const stops: Record<number, string> = {};
+      for (const k of keyStepsFor(op)) stops[k.stepIndex] = k.text;
+      p.start(op, { exampleStops: stops });
+      return;
+    }
     p.start(op);
   };
 
@@ -347,6 +357,7 @@ export function LabWorkspace({
             <StackCanvas step={step} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
           )}
         </div>
+        <ExampleBox p={p} />
         <PredictBox p={p} />
         <DoBox p={p} />
         {explained && (

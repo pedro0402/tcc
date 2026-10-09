@@ -28,6 +28,17 @@ export interface PlayerState {
   doAsking: number | null;
   /** passo -> id de nó escolhido (ou null para "null"). */
   doAnswered: Record<number, number | null>;
+  /**
+   * Modo Exemplo (demonstração comentada): pausa nos passos-chave mostrando um
+   * comentário até o aluno continuar. Não envolve resposta nem placar.
+   */
+  exampleMode: boolean;
+  /** Passos onde a demonstração pausa: índice do passo -> comentário. */
+  exampleStops: Record<number, string>;
+  /** Passo-chave em que a demonstração está parada agora. */
+  examplePaused: number | null;
+  /** Passos-chave já comentados nesta execução (não pausa de novo). */
+  exampleSeen: Record<number, true>;
   /** Placar da sessão: sobrevive à troca de operação. */
   score: { ok: number; total: number };
   /**
@@ -51,12 +62,17 @@ export const initialPlayerState: PlayerState = {
   doSteps: [],
   doAsking: null,
   doAnswered: {},
+  exampleMode: false,
+  exampleStops: {},
+  examplePaused: null,
+  exampleSeen: {},
   score: { ok: 0, total: 0 },
   finished: false,
 };
 
 export type PlayerAction =
-  | { type: "START"; op: Op; autoPlay?: boolean; doSteps?: DoStep[] }
+  | { type: "START"; op: Op; autoPlay?: boolean; doSteps?: DoStep[]; exampleStops?: Record<number, string> }
+  | { type: "CONTINUE_EXAMPLE" }
   | { type: "NEXT" }
   | { type: "PREV" }
   | { type: "ANSWER"; choice: number }
@@ -71,7 +87,8 @@ export type PlayerAction =
   | { type: "SET_SPEED"; speed: number }
   | { type: "SET_PREDICT_MODE"; on: boolean }
   | { type: "SET_CONFIDENCE_MODE"; on: boolean }
-  | { type: "SET_DO_MODE"; on: boolean };
+  | { type: "SET_DO_MODE"; on: boolean }
+  | { type: "SET_EXAMPLE_MODE"; on: boolean };
 
 /** A pergunta de ponteiro que revela o passo `n`, se houver (modo Fazer). */
 export function doStepAt(s: PlayerState, n: number): DoStep | undefined {
@@ -123,15 +140,22 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
         doSteps: a.doSteps ?? [],
         doAsking: null,
         doAnswered: {},
+        exampleStops: a.exampleStops ?? {},
+        examplePaused: null,
+        exampleSeen: {},
         asking: null,
         finished: false,
         playing: a.autoPlay ?? true,
       };
 
     case "NEXT": {
-      if (!s.op || s.asking !== null || s.doAsking !== null) return s;
+      if (!s.op || s.asking !== null || s.doAsking !== null || s.examplePaused !== null) return s;
       const n = s.idx + 1;
       if (n >= s.op.steps.length) return { ...s, playing: false };
+      // Modo Exemplo: ao chegar num passo-chave ainda não comentado, pausa e mostra.
+      if (s.exampleMode && s.exampleStops[n] !== undefined && !s.exampleSeen[n]) {
+        return { ...s, idx: n, examplePaused: n, exampleSeen: { ...s.exampleSeen, [n]: true }, playing: false };
+      }
       // Modo Fazer tem prioridade: se o próximo passo tem pergunta de ponteiro, abre-a.
       if (s.doMode && doStepAt(s, n) && s.doAnswered[n] === undefined) {
         return { ...s, doAsking: n, playing: false };
@@ -142,8 +166,12 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
       return { ...s, idx: n };
     }
 
+    case "CONTINUE_EXAMPLE":
+      if (s.examplePaused === null) return s;
+      return { ...s, examplePaused: null, playing: true };
+
     case "PREV":
-      return { ...s, playing: false, asking: null, doAsking: null, idx: Math.max(0, s.idx - 1) };
+      return { ...s, playing: false, asking: null, doAsking: null, examplePaused: null, idx: Math.max(0, s.idx - 1) };
 
     case "ANSWER": {
       // Com o modo confiança ligado, não aceita resposta antes do nível.
@@ -184,10 +212,11 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
 
     case "SKIP":
       if (!s.op) return s;
-      return { ...s, asking: null, doAsking: null, idx: s.op.steps.length - 1, playing: false };
+      return { ...s, asking: null, doAsking: null, examplePaused: null, idx: s.op.steps.length - 1, playing: false };
 
     case "RESTART":
-      return { ...s, idx: 0, asking: null, doAsking: null, playing: false };
+      // Reinicia a demonstração: os passos-chave voltam a comentar.
+      return { ...s, idx: 0, asking: null, doAsking: null, examplePaused: null, exampleSeen: {}, playing: false };
 
     case "DONE":
       return { ...s, finished: true, playing: false };
@@ -206,5 +235,8 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
 
     case "SET_DO_MODE":
       return { ...s, doMode: a.on };
+
+    case "SET_EXAMPLE_MODE":
+      return { ...s, exampleMode: a.on };
   }
 }
