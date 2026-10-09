@@ -19,6 +19,10 @@
   font-size: 1.02rem;
 }
 
+.prompt:focus {
+  outline: none; /* foco programático: o texto não é um controle */
+}
+
 .form {
   display: flex;
   flex-wrap: wrap;
@@ -64,5 +68,94 @@
 
 .bad {
   margin: 12px 0 0;
+  color: var(--red);
+}
+
+.optionOk,
+.optionBad,
+.optionDim {
+  font-size: 0.88rem;
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  cursor: default;
+}
+
+.optionOk {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.optionBad {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.optionDim {
+  opacity: 0.6;
+}
+
+.mark {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.primary,
+.secondary {
+  font-size: 0.88rem;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  border: 0;
+  background: var(--accent);
+  color: #101216;
+}
+
+.secondary {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+}
+
+.review {
+  margin: 12px 0 0;
+  font-size: 0.92rem;
+}
+
+.reviewTitle {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.review ul {
+  margin: 0;
+  padding-left: 1.1em;
+  display: grid;
+  gap: 6px;
+}
+
+.feedback {
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+
+.okText {
+  color: var(--accent);
+}
+
+.badText {
   color: var(--red);
 }
