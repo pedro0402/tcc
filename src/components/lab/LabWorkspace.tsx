@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import * as E from "../../engine/viva/engine";
 import type { Node, Op, Step, Structure } from "../../engine/viva/engine";
 import type { OpId } from "../../engine/viva/opIds";
+import { listOps } from "../../engine/viva/lists";
+import { chain } from "../../engine/viva/links";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
@@ -11,21 +13,31 @@ import styles from "../viva/viva.module.css";
 /** Nome da operação "vazia" que só exibe o estado atual. Não conta como progresso. */
 export const IDLE = "idle";
 
-export const idleOp = (structure: Structure, nodes: Node[]): Op => ({
+/** Passo "parado": só mostra o estado atual, com os ponteiros de entrada da estrutura. */
+export function idleStepFor(structure: Structure, nodes: Node[], kind?: ListKind): Step {
+  const n = nodes.length;
+  const pointers: Record<string, number | null> =
+    structure === "stack"
+      ? { topo: n ? 0 : null }
+      : { cabeca: n ? 0 : null, ...(kind === "dupla" ? { cauda: n ? n - 1 : null } : {}) };
+  return {
+    line: -1,
+    nodes,
+    pointers,
+    highlight: [],
+    message: "Escolha uma operação para começar.",
+    vars: {},
+    // Lista dupla/circular: mostra as ligações reais (null nas pontas, retorno à cabeça).
+    links: structure === "linkedList" && kind && kind !== "simples" ? chain(n, kind) : undefined,
+  };
+}
+
+export const idleOp = (structure: Structure, nodes: Node[], kind?: ListKind): Op => ({
   name: IDLE,
   structure,
   code: [],
   final: nodes,
-  steps: [
-    {
-      line: -1,
-      nodes,
-      pointers: {},
-      highlight: [],
-      message: "Escolha uma operação para começar.",
-      vars: {},
-    },
-  ],
+  steps: [idleStepFor(structure, nodes, kind)],
 });
 
 export interface LabWorkspaceProps {
@@ -93,10 +105,21 @@ export function LabWorkspace({
   useEffect(() => {
     if (lastStructure.current === structure) return;
     lastStructure.current = structure;
-    p.start(idleOp(structure, nodes));
+    p.start(idleOp(structure, nodes, kind));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [structure]);
 
+  // Ao trocar o tipo da lista (simples/dupla/circular), limpa a visualização
+  // da operação anterior, que pertence a outro tipo.
+  const lastKind = useRef(kind);
+  useEffect(() => {
+    if (lastKind.current === kind) return;
+    lastKind.current = kind;
+    if (!p.busy) p.start(idleOp(structure, nodes, kind));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
+
+  const L = listOps(kind);
   const can = (id: OpId) => !allowed || allowed.includes(id);
   const any = (...ids: OpId[]) => ids.some(can);
 
@@ -105,14 +128,7 @@ export function LabWorkspace({
   const valid = !Number.isNaN(v());
   const posValid = !Number.isNaN(ps());
 
-  const idleStep: Step = {
-    line: -1,
-    nodes,
-    pointers: { [isList ? "cabeca" : "topo"]: nodes.length ? 0 : null },
-    highlight: [],
-    message: "Escolha uma operação para começar.",
-    vars: {},
-  };
+  const idleStep = idleStepFor(structure, nodes, kind);
   const step = p.op ? p.step : idleStep;
 
   const run = (op: Op) => {
@@ -121,7 +137,7 @@ export function LabWorkspace({
 
   const clear = () => {
     onNodesChange([], structure);
-    p.start(idleOp(structure, []));
+    p.start(idleOp(structure, [], kind));
   };
 
   return (
@@ -147,7 +163,7 @@ export function LabWorkspace({
                 <div className={styles.groupTitle}>Tipo</div>
                 <div className={styles.kindRow}>
                   {(["simples", "dupla", "circular"] as ListKind[]).map((k) => (
-                    <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} onClick={() => onKindChange(k)} aria-pressed={kind === k}>
+                    <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} disabled={p.busy} onClick={() => onKindChange(k)} aria-pressed={kind === k}>
                       {k}
                     </Button>
                   ))}
@@ -156,20 +172,20 @@ export function LabWorkspace({
             )}
             {any("insertHead", "insertTail", "insertAt") && (
               <Group title="Inserir">
-                {can("insertHead") && <Button disabled={!valid || p.busy} onClick={() => run(E.listInsertHead(nodes, v()))}>No início</Button>}
-                {can("insertTail") && <Button disabled={!valid || p.busy} onClick={() => run(E.listInsertTail(nodes, v()))}>No fim</Button>}
-                {can("insertAt") && <Button disabled={!valid || !posValid || p.busy} onClick={() => run(E.listInsertAt(nodes, ps(), v()))}>Na posição</Button>}
+                {can("insertHead") && <Button disabled={!valid || p.busy} onClick={() => run(L.insertHead(nodes, v()))}>No início</Button>}
+                {can("insertTail") && <Button disabled={!valid || p.busy} onClick={() => run(L.insertTail(nodes, v()))}>No fim</Button>}
+                {can("insertAt") && <Button disabled={!valid || !posValid || p.busy} onClick={() => run(L.insertAt(nodes, ps(), v()))}>Na posição</Button>}
               </Group>
             )}
             {any("removeAt", "removeValue") && (
               <Group title="Remover">
-                {can("removeAt") && <Button variant="outline" disabled={!posValid || p.busy} onClick={() => run(E.listRemoveAt(nodes, ps()))}>Da posição</Button>}
-                {can("removeValue") && <Button variant="outline" disabled={!valid || p.busy} onClick={() => run(E.listRemoveValue(nodes, v()))}>Por valor</Button>}
+                {can("removeAt") && <Button variant="outline" disabled={!posValid || p.busy} onClick={() => run(L.removeAt(nodes, ps()))}>Da posição</Button>}
+                {can("removeValue") && <Button variant="outline" disabled={!valid || p.busy} onClick={() => run(L.removeValue(nodes, v()))}>Por valor</Button>}
               </Group>
             )}
             {can("search") && (
               <Group title="Percorrer">
-                <Button variant="secondary" disabled={!valid || p.busy} onClick={() => run(E.listSearch(nodes, v()))}>Buscar valor</Button>
+                <Button variant="secondary" disabled={!valid || p.busy} onClick={() => run(L.search(nodes, v()))}>Buscar valor</Button>
               </Group>
             )}
           </>

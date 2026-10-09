@@ -4,6 +4,8 @@
 // A variante "humano" descreve cada linha em português corrente.
 
 import { listCode, stackCode } from "./engine";
+import { LIST_VARIANTS } from "./codeVariantsLists";
+import type { ListKind } from "./links";
 
 export type CodeLang = "humano" | "js" | "python" | "java" | "c";
 
@@ -497,9 +499,23 @@ const BANK: Record<string, Variants> = {
   ),
 };
 
-/** Devolve o código da operação na linguagem pedida, alinhado linha a linha. */
-export function codeFor(opName: string, lang: CodeLang, pseudo: string[]): string[] {
-  const variants = BANK[opName];
+// Operações cujo código é idêntico ao da lista simples nas outras variantes.
+BANK["buscar@dupla"] = BANK.buscar; // percurso para frente, igual ao da simples
+BANK["inserirEm@circular"] = BANK.inserirEm; // o laço já dá a volta sozinho
+Object.assign(BANK, LIST_VARIANTS);
+
+/**
+ * Devolve o código da operação na linguagem pedida, alinhado linha a linha.
+ * `variant` escolhe a versão da lista (dupla/circular); sem ela vale a simples.
+ */
+export function codeFor(
+  opName: string,
+  lang: CodeLang,
+  pseudo: string[],
+  variant?: ListKind,
+): string[] {
+  const key = variant && variant !== "simples" ? `${opName}@${variant}` : opName;
+  const variants = BANK[key];
   if (!variants) return pseudo; // fallback: usa o pseudocódigo do motor
   const lines = variants[lang];
   // Garante alinhamento: se por algum motivo o tamanho divergir, cai no pseudo.

@@ -38,7 +38,7 @@ export function CodePanel({ p }: { p: PlayerApi }) {
       ? ["// escolha uma operação ao lado", "// para ver o passo a passo em português"]
       : ["// escolha uma operação ao lado", "// para ver o código executando"];
   const code =
-    p.op && p.op.code.length ? codeFor(p.op.name, lang, p.op.code) : idlePlaceholder;
+    p.op && p.op.code.length ? codeFor(p.op.name, lang, p.op.code, p.op.variant) : idlePlaceholder;
   return (
     <div className={styles.code}>
       <div className={styles.codeHead}>

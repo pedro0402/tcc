@@ -5,6 +5,8 @@
 // pausa ANTES de mostrar esse passo, então o aluno responde vendo o passo
 // anterior e depois confere a resposta no desenho.
 
+import type { Links, ListKind } from "./links";
+
 export type Node = { id: number; value: number };
 export type Predict = { question: string; options: string[]; answer: number };
 export type Step = {
@@ -17,6 +19,8 @@ export type Step = {
   vars: Record<string, string>;
   predict?: Predict;
   error?: boolean;
+  /** Ligações reais dos nós neste passo (listas). Sem isto, a cadeia é deduzida. */
+  links?: Links;
 };
 export type Structure = "stack" | "linkedList";
 export type Op = {
@@ -25,6 +29,8 @@ export type Op = {
   steps: Step[];
   code: string[];
   final: Node[];
+  /** Variante da lista (ausente = simples ou pilha). */
+  variant?: ListKind;
 };
 
 let nextId = 1;
@@ -39,13 +45,13 @@ function shuffle(correct: string, wrong: string[]): Omit<Predict, "question"> {
   return { options: opts, answer: opts.indexOf(correct) };
 }
 
-const ask = (question: string, correct: string, wrong: string[]): Predict => ({
+export const ask = (question: string, correct: string, wrong: string[]): Predict => ({
   ...shuffle(correct, wrong),
   question,
 });
 
-const valOrNull = (n: Node | undefined) => (n ? `${n.value}` : "null");
-const isIndex = (n: number) => Number.isInteger(n);
+export const valOrNull = (n: Node | undefined) => (n ? `${n.value}` : "null");
+export const isIndex = (n: number) => Number.isInteger(n);
 
 /* ======================= PILHA ======================= */
 export const stackCode = {
