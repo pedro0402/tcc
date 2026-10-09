@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { eventSchema, eventsBodySchema } from "./events";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
@@ -165,6 +166,42 @@ export function createApp() {
     const total = attempts.length;
     const correct = attempts.filter((a) => a.isCorrect).length;
     return res.json({ total, correct });
+  });
+
+  // Eventos de aprendizagem em lote. Idempotente: reenviar o mesmo evento não duplica,
+  // e o id do cliente só vale dentro da conta de quem enviou.
+  app.post("/events", requireAuth, async (req, res) => {
+    const user = (req as express.Request & { user: JwtPayload }).user;
+    const body = eventsBodySchema.safeParse(req.body);
+    if (!body.success) return res.status(400).json({ error: "invalid_body" });
+
+    let accepted = 0;
+    let rejected = 0;
+    for (const raw of body.data.events) {
+      const parsed = eventSchema.safeParse(raw);
+      if (!parsed.success) {
+        rejected++;
+        continue;
+      }
+      const { id, ts, ...rest } = parsed.data;
+      await prisma.learningEvent.upsert({
+        where: { userId_clientId: { userId: user.userId, clientId: id } },
+        create: { userId: user.userId, clientId: id, occurredAt: new Date(ts), ...rest },
+        update: {},
+      });
+      accepted++;
+    }
+    return res.status(201).json({ accepted, rejected });
+  });
+
+  app.get("/events", requireAuth, async (req, res) => {
+    const user = (req as express.Request & { user: JwtPayload }).user;
+    const rows = await prisma.learningEvent.findMany({
+      where: { userId: user.userId },
+      orderBy: { occurredAt: "desc" },
+      take: 500,
+    });
+    return res.json(rows);
   });
 
   return app;
