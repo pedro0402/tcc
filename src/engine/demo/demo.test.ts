@@ -45,7 +45,7 @@ describe("scriptFromOp", () => {
       expect(frame.line).toBe(op.steps[i].line);
       expect(frame.order.map((id) => Number(id))).toEqual(op.steps[i].nodes.map((n) => n.id));
     });
-    const last = script.frames.at(-1)!;
+    const last = script.frames[script.frames.length - 1];
     expect(last.order).toHaveLength(3);
   });
 });
