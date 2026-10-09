@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import * as E from "../engine/viva/engine";
 import type { Node, Op, Structure } from "../engine/viva/engine";
 import type { PredictEvent } from "../components/viva/usePlayer";
 import type { ListKind } from "../components/viva/Canvas";
@@ -22,8 +21,10 @@ function tabFromHash(): Tab {
 export function LabPage() {
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [kind, setKind] = useState<ListKind>("simples");
-  const [list, setList] = useState<Node[]>(() => [3, 8, 15].map(E.mk));
-  const [stack, setStack] = useState<Node[]>(() => [12, 7].map(E.mk));
+  // O simulador começa vazio: o aluno monta a estrutura com as operações
+  // (ou pelo campo "Estado inicial").
+  const [list, setList] = useState<Node[]>([]);
+  const [stack, setStack] = useState<Node[]>([]);
   const [busy, setBusy] = useState(false);
 
   const onNodesChange = useCallback((nodes: Node[], structure: Structure) => {
