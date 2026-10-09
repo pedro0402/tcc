@@ -57,12 +57,15 @@ const OBSERVE: Record<Structure, ObserveScript> = {
 
 /* ------------------------------ PREVER ------------------------------ */
 // Operações demonstradas no Prever, sobre o estado herdado do Observar.
-const PREVIEW: Record<Structure, OpSpec[]> = {
+const PREVIEW: Record<Structure, ScriptStep[]> = {
   linkedList: [
-    { op: "insertHead", value: 1 },
-    { op: "removeAt", pos: 0 },
+    { spec: { op: "insertHead", value: 1 }, caption: "Inserir no início: tente prever quem passa a ser a cabeça." },
+    { spec: { op: "removeAt", pos: 0 }, caption: "Remover a cabeça: preveja qual nó assume o início da lista." },
   ],
-  stack: [{ op: "push", value: 5 }, { op: "pop" }],
+  stack: [
+    { spec: { op: "push", value: 5 }, caption: "push(5): preveja onde o novo valor entra." },
+    { spec: { op: "pop" }, caption: "pop: preveja qual valor sai." },
+  ],
 };
 
 /* ------------------------------- FAZER ------------------------------- */
@@ -98,6 +101,6 @@ const DESAFIO: Record<Structure, DesafioSpec> = {
 };
 
 export const observeScript = (s: Structure): ObserveScript => OBSERVE[s];
-export const previewOps = (s: Structure): OpSpec[] => PREVIEW[s];
+export const previewScript = (s: Structure): ScriptStep[] => PREVIEW[s];
 export const fazerGoal = (s: Structure): Goal => FAZER[s];
 export const desafioSpec = (s: Structure): DesafioSpec => DESAFIO[s];

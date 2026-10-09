@@ -32,8 +32,9 @@ import {
   desafioSpec,
   fazerGoal,
   observeScript,
-  previewOps,
+  previewScript,
   type Goal,
+  type ScriptStep,
 } from "../../content/scaffoldScripts";
 import { keyStepsFor } from "../../content/workedExamples";
 import { usePlayer, type PredictEvent } from "../viva/usePlayer";
@@ -114,10 +115,13 @@ export function LabWorkspace({
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
-  // Fila de operações do roteiro automático (Observar e Prever).
-  const scriptQueue = useRef<OpSpec[]>([]);
+  // Fila de passos do roteiro automático (Observar e Prever).
+  const scriptQueue = useRef<ScriptStep[]>([]);
   // Estado em que o Observar terminou, herdado pelo Prever.
   const observeResult = useRef<number[] | null>(null);
+  // Progresso visível do roteiro: "operação atual de total" e a legenda.
+  const [scriptProgress, setScriptProgress] = useState<{ index: number; total: number; caption: string } | null>(null);
+  const scriptTotal = useRef(0);
 
   // Estado do estágio Fazer e Desafio.
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -131,8 +135,11 @@ export function LabWorkspace({
   const runNextScripted = useCallback((base: Node[]) => {
     const q = scriptQueue.current;
     if (q.length === 0) return false;
-    const spec = q.shift()!;
-    const op = opFromSpec(structure, kind, base, spec);
+    const stepDef = q.shift()!;
+    const op = opFromSpec(structure, kind, base, stepDef.spec);
+    // Mostra "operação atual de total" com a legenda do roteiro.
+    const index = scriptTotal.current - q.length;
+    setScriptProgress({ index, total: scriptTotal.current, caption: stepDef.caption });
     if (stageRef.current === "observar") {
       const stops: Record<number, string> = {};
       for (const k of keyStepsFor(op)) stops[k.stepIndex] = k.text;
@@ -158,6 +165,9 @@ export function LabWorkspace({
       if (scriptQueue.current.length > 0) {
         const base = op.final;
         setTimeout(() => runNextScripted(base), 600);
+      } else {
+        // Roteiro terminou: deixa o indicador no total e marca como concluído.
+        setScriptProgress((prev) => (prev ? { ...prev, index: prev.total } : prev));
       }
       return;
     }
@@ -205,6 +215,7 @@ export function LabWorkspace({
   const setupStage = useCallback((st: Stage) => {
     setExplained(null);
     setGoalDone(false);
+    setScriptProgress(null);
     scriptQueue.current = [];
     p.setPredictMode(st === "prever");
     p.setDoMode(st === "fazer");
@@ -212,7 +223,8 @@ export function LabWorkspace({
 
     if (st === "observar") {
       const script = observeScript(structure);
-      scriptQueue.current = script.steps.map((s) => s.spec);
+      scriptQueue.current = [...script.steps];
+      scriptTotal.current = script.steps.length;
       setGoal(null);
       setDesafio(null);
       const initialNodes = nodesFromValues(script.initial);
@@ -225,7 +237,8 @@ export function LabWorkspace({
     if (st === "prever") {
       const base = observeResult.current ?? observeScript(structure).initial;
       const baseNodes = nodesFromValues(base);
-      scriptQueue.current = [...previewOps(structure)];
+      scriptQueue.current = [...previewScript(structure)];
+      scriptTotal.current = scriptQueue.current.length;
       setGoal(null);
       setDesafio(null);
       onNodesChange(baseNodes, structure);
@@ -408,6 +421,16 @@ export function LabWorkspace({
             )}
           </p>
         </div>
+
+        {/* Indicador do roteiro automático (Observar/Prever) */}
+        {(stage === "observar" || stage === "prever") && scriptProgress && (
+          <div className={styles.scriptBar} aria-live="polite">
+            <span className={styles.scriptCount}>
+              Operação {Math.min(scriptProgress.index, scriptProgress.total)} de {scriptProgress.total}
+            </span>
+            <span className={styles.scriptCaption}>{scriptProgress.caption}</span>
+          </div>
+        )}
 
         {/* Meta do Fazer */}
         {stage === "fazer" && goal && (

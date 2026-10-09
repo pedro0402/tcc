@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runOps } from "../engine/viva/runOps";
-import { desafioSpec, fazerGoal, observeScript, previewOps } from "./scaffoldScripts";
+import { desafioSpec, fazerGoal, observeScript, previewScript } from "./scaffoldScripts";
 
 const STRUCTS = ["linkedList", "stack"] as const;
 
@@ -18,9 +18,11 @@ describe("operações do Prever", () => {
   it.each(STRUCTS)("%s: rodam sem erro sobre o estado final do Observar", (structure) => {
     const script = observeScript(structure);
     const base = runOps(structure, "simples", script.initial, script.steps.map((s) => s.spec)).values;
-    const r = runOps(structure, "simples", base, previewOps(structure));
+    const preview = previewScript(structure);
+    const r = runOps(structure, "simples", base, preview.map((s) => s.spec));
     expect(r.errors).toBe(0);
-    expect(previewOps(structure).length).toBeGreaterThan(0);
+    expect(preview.length).toBeGreaterThan(0);
+    expect(preview.every((s) => s.caption.length > 10)).toBe(true);
   });
 });
 

@@ -899,6 +899,31 @@
   color: var(--ev-muted-fg);
 }
 
+.scriptBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-border);
+  background: var(--ev-card);
+}
+
+.scriptCount {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ev-primary);
+  white-space: nowrap;
+}
+
+.scriptCaption {
+  color: var(--ev-fg);
+  line-height: 1.4;
+}
+
 .sideQuiet {
   padding: 16px;
 }
