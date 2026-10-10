@@ -8,17 +8,7 @@ import { opFromSpec, type OpSpec } from "../../engine/viva/runOps";
 import { nodesFromValues } from "../../engine/viva/initialState";
 import { selfExplainFor } from "../../content/selfExplain";
 import { recordSelfExplanation } from "../../persistence/localProgress";
-import {
-  applyAttempt,
-  initialScaffold,
-  remainingToAdvance,
-  setStage,
-  STAGES,
-  STAGE_HINT,
-  STAGE_LABEL,
-  type ScaffoldState,
-  type Stage,
-} from "../../engine/viva/scaffold";
+import { STAGES, STAGE_HINT, STAGE_LABEL, type Stage } from "../../engine/viva/scaffold";
 import { matchesTarget } from "../../engine/viva/challenge";
 import {
   afterStep,
@@ -110,8 +100,9 @@ export function LabWorkspace({
   opDoneRef.current = onOpDone;
   predictRef.current = onPredict;
 
-  const [scaffold, setScaffold] = useState<ScaffoldState>(initialScaffold);
-  const stage = scaffold.stage;
+  // Estágio escolhido pelo aluno (navegação manual pelos botões). Não há mais
+  // troca automática: cada estágio é uma atividade distinta.
+  const [stage, setStage] = useState<Stage>("observar");
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
@@ -178,23 +169,15 @@ export function LabWorkspace({
       return;
     }
 
-    // Fazer: verifica a meta.
+    // Fazer: verifica a meta. Concluir marca a atividade, mas não troca de
+    // estágio sozinho — quem muda de estágio é o aluno, pelos botões.
     if (st === "fazer" && goal) {
-      const reached = matchesTarget(goal.target, op.final.map((n) => n.value));
-      if (reached) {
-        setGoalDone(true);
-        setScaffold((s) => applyAttempt(s, { correct: true }));
-      }
+      if (matchesTarget(goal.target, op.final.map((n) => n.value))) setGoalDone(true);
     }
 
-    // Desafio: conta o passo e reavalia tempo/meta.
+    // Desafio: conta o passo e reavalia tempo/meta (sem mexer no estágio).
     if (st === "desafio") {
-      setDesafio((d) => {
-        if (!d || d.status !== "running") return d;
-        const next = afterStep(d, op.final.map((n) => n.value));
-        if (next.status === "won") setScaffold((s) => applyAttempt(s, { correct: true }));
-        return next;
-      });
+      setDesafio((d) => (d && d.status === "running" ? afterStep(d, op.final.map((n) => n.value)) : d));
     }
 
     // Autoexplicação só nos estágios de prática.
@@ -204,12 +187,8 @@ export function LabWorkspace({
 
   const handlePredict = useCallback((e: PredictEvent) => {
     predictRef.current?.(e);
-    setScaffold((s) => applyAttempt(s, { correct: e.correct }));
   }, []);
-  const handleDo = useCallback((e: { correct: boolean }) => {
-    setScaffold((s) => applyAttempt(s, { correct: e.correct }));
-  }, []);
-  const p = usePlayer({ onDone: handleDone, onPredict: handlePredict, onDo: handleDo });
+  const p = usePlayer({ onDone: handleDone, onPredict: handlePredict });
 
   useEffect(() => {
     onBusyChange?.(p.busy);
@@ -229,7 +208,8 @@ export function LabWorkspace({
     setScriptProgress(null);
     scriptQueue.current = [];
     p.setPredictMode(st === "prever");
-    p.setDoMode(st === "fazer");
+    // No Fazer o aluno opera livremente até a meta: nada de perguntas de ponteiro.
+    p.setDoMode(false);
     p.setExampleMode(st === "observar");
 
     if (st === "observar") {
@@ -416,20 +396,13 @@ export function LabWorkspace({
                 variant={stage === st ? "default" : "outline"}
                 aria-pressed={stage === st}
                 disabled={p.busy}
-                onClick={() => setScaffold((s) => setStage(s, st))}
+                onClick={() => setStage(st)}
               >
                 {STAGE_LABEL[st]}
               </Button>
             ))}
           </div>
-          <p className={styles.stageHint}>
-            {STAGE_HINT[stage]}
-            {remainingToAdvance(scaffold) > 0 && stage !== "desafio" && (
-              <span className={styles.stageProgress}>
-                {" "}Faltam {remainingToAdvance(scaffold)} acerto(s) sem dica para o próximo nível.
-              </span>
-            )}
-          </p>
+          <p className={styles.stageHint}>{STAGE_HINT[stage]}</p>
         </div>
 
         {/* Indicador do roteiro automático (Observar/Prever) */}
