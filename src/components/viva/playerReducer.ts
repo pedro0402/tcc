@@ -109,6 +109,17 @@ export function needsConfidence(s: PlayerState): boolean {
   );
 }
 
+/**
+ * Revela o passo `n`. No modo Exemplo, se `n` é um passo-chave ainda não
+ * comentado, para nele mostrando o comentário.
+ */
+function revealAt(s: PlayerState, n: number, playing: boolean): PlayerState {
+  if (s.exampleMode && s.exampleStops[n] !== undefined && !s.exampleSeen[n]) {
+    return { ...s, idx: n, examplePaused: n, exampleSeen: { ...s.exampleSeen, [n]: true }, playing: false };
+  }
+  return { ...s, idx: n, playing };
+}
+
 /** A resposta só vale com uma previsão aberta e ainda sem resposta. */
 export function canAnswer(s: PlayerState): boolean {
   return s.asking !== null && !!s.op && s.answered[s.asking] === undefined;
@@ -158,18 +169,18 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
       if (!s.op || s.asking !== null || s.doAsking !== null || s.examplePaused !== null) return s;
       const n = s.idx + 1;
       if (n >= s.op.steps.length) return { ...s, playing: false };
-      // Modo Exemplo: ao chegar num passo-chave ainda não comentado, pausa e mostra.
-      if (s.exampleMode && s.exampleStops[n] !== undefined && !s.exampleSeen[n]) {
-        return { ...s, idx: n, examplePaused: n, exampleSeen: { ...s.exampleSeen, [n]: true }, playing: false };
+      // Depois do fim (inclusive após "Pular"), avançar é só revisão: o resultado já
+      // foi visto, então nenhuma pergunta reabre nem conta no placar.
+      if (!s.finished) {
+        // Perguntas vêm antes de revelar o passo; o Fazer tem prioridade.
+        if (s.doMode && doStepAt(s, n) && s.doAnswered[n] === undefined) {
+          return { ...s, doAsking: n, playing: false };
+        }
+        if (s.predictMode && s.op.steps[n].predict && s.answered[n] === undefined) {
+          return { ...s, asking: n, playing: false };
+        }
       }
-      // Modo Fazer tem prioridade: se o próximo passo tem pergunta de ponteiro, abre-a.
-      if (s.doMode && doStepAt(s, n) && s.doAnswered[n] === undefined) {
-        return { ...s, doAsking: n, playing: false };
-      }
-      if (s.predictMode && s.op.steps[n].predict && s.answered[n] === undefined) {
-        return { ...s, asking: n, playing: false };
-      }
-      return { ...s, idx: n };
+      return revealAt(s, n, s.playing);
     }
 
     case "CONTINUE_EXAMPLE":
@@ -210,18 +221,21 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
 
     case "CONTINUE_DO":
       if (s.doAsking === null) return s;
-      return { ...s, idx: s.doAsking, doAsking: null, playing: true };
+      // O passo revelado pode ser também um passo-chave do exemplo.
+      return revealAt({ ...s, doAsking: null }, s.doAsking, true);
 
     case "CONTINUE":
       if (s.asking === null) return s;
-      return { ...s, idx: s.asking, asking: null, playing: true };
+      return revealAt({ ...s, asking: null }, s.asking, true);
 
     case "SKIP":
       if (!s.op) return s;
       return { ...s, asking: null, doAsking: null, examplePaused: null, idx: s.op.steps.length - 1, playing: false };
 
     case "RESTART":
-      // Reinicia a demonstração: os passos-chave voltam a comentar.
+      // Reinicia a demonstração: os passos-chave voltam a comentar. As respostas
+      // são mantidas de propósito: rever a mesma operação não pergunta de novo
+      // nem pontua duas vezes (para perguntar de novo, inicia-se a operação outra vez).
       return { ...s, idx: 0, asking: null, doAsking: null, examplePaused: null, exampleSeen: {}, playing: false };
 
     case "DONE":

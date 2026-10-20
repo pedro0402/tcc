@@ -361,11 +361,41 @@ describe("fim da operação", () => {
 });
 
 describe("correções do player", () => {
+  const last = (s: PlayerState) => s.op!.steps.length - 1;
+
   it("ligar 'Pedir confiança' depois de responder não trava a previsão", () => {
     const s = run(atQuestion(), { type: "ANSWER", choice: 0 }, { type: "SET_CONFIDENCE_MODE", on: true });
     expect(needsConfidence(s)).toBe(false);
     const next = run(s, { type: "CONTINUE" });
     expect(next.asking).toBeNull();
     expect(next.idx).toBe(PRED_STEP);
+  });
+
+  it("depois de Pular, voltar e avançar não reabre a previsão nem pontua", () => {
+    let s = run(started(), { type: "SKIP" }, { type: "DONE" });
+    expect(s.finished).toBe(true);
+    for (let i = 0; i < last(s); i++) s = run(s, { type: "PREV" });
+    for (let i = 0; i < last(s); i++) s = run(s, { type: "NEXT" });
+    expect(s.asking).toBeNull();
+    expect(s.idx).toBe(last(s));
+    expect(s.score).toEqual({ ok: 0, total: 0 });
+  });
+
+  it("passo-chave do exemplo que também tem previsão: pergunta primeiro, comenta depois", () => {
+    let s = run(initialPlayerState, {
+      type: "START",
+      op: pushOp(),
+      autoPlay: false,
+      exampleStops: { [PRED_STEP]: "comentário" },
+    });
+    s = run(s, { type: "SET_EXAMPLE_MODE", on: true }, { type: "SET_PREDICT_MODE", on: true });
+    for (let i = 0; i < PRED_STEP; i++) s = run(s, { type: "NEXT" });
+    s = run(s, { type: "NEXT" });
+    expect(s.asking).toBe(PRED_STEP);
+    expect(s.examplePaused).toBeNull();
+    s = run(s, { type: "ANSWER", choice: 0 }, { type: "CONTINUE" });
+    expect(s.idx).toBe(PRED_STEP);
+    expect(s.examplePaused).toBe(PRED_STEP);
+    expect(s.playing).toBe(false);
   });
 });
