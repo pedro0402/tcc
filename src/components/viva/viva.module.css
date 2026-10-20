@@ -850,12 +850,6 @@
   outline-offset: 2px;
 }
 
-.detailRow {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 .initialRow {
   display: flex;
   gap: 8px;

@@ -96,7 +96,6 @@ export function LabWorkspace({
   const isList = structure === "linkedList";
   const [val, setVal] = useState("42");
   const [pos, setPos] = useState("1");
-  const [detail, setDetail] = useState<"essencial" | "completo">("completo");
 
   const nodesChangeRef = useRef(onNodesChange);
   const opDoneRef = useRef(onOpDone);
@@ -538,20 +537,7 @@ export function LabWorkspace({
       </section>
 
       <aside className={styles.codeAside} aria-label="Código">
-        <div className={styles.detailRow} role="group" aria-label="Nível de detalhe">
-          {(["essencial", "completo"] as const).map((d) => (
-            <Button
-              key={d}
-              size="sm"
-              variant={detail === d ? "default" : "outline"}
-              aria-pressed={detail === d}
-              onClick={() => setDetail(d)}
-            >
-              {d === "essencial" ? "Essencial" : "Completo"}
-            </Button>
-          ))}
-        </div>
-        <CodePanel p={p} showVars={detail === "completo"} />
+        <CodePanel p={p} />
       </aside>
     </div>
   );

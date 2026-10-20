@@ -41,7 +41,7 @@ export function Controls({ p }: { p: PlayerApi }) {
 /** Quantidade de espaços no começo da linha de código. */
 const indentOf = (line: string) => line.length - line.trimStart().length;
 
-export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boolean }) {
+export function CodePanel({ p }: { p: PlayerApi }) {
   const [lang, setLang] = useState<CodeLang>("humano");
   const idlePlaceholder =
     lang === "humano"
@@ -86,7 +86,7 @@ export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boo
           );
         })}
       </pre>
-      {showVars && p.step && Object.keys(p.step.vars).length > 0 && (
+      {p.step && Object.keys(p.step.vars).length > 0 && (
         <div className={styles.vars}>
           <div className={styles.varsHead}>variáveis</div>
           {Object.entries(p.step.vars).map(([k, v]) => (
