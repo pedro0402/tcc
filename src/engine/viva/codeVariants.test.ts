@@ -150,3 +150,11 @@ describe("codeVariants — o código exibido é executável", () => {
     }
   });
 });
+
+describe("codeFor — alinhamento com o código recebido", () => {
+  it("se o código do motor mudar de tamanho, mostra o código do motor", () => {
+    const op = E.listInsertHead([E.mk(1)], 2);
+    const changed = [...op.code, "  // linha nova"];
+    expect(codeFor(op.name, "python", changed)).toBe(changed);
+  });
+});

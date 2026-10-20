@@ -518,6 +518,8 @@ export function codeFor(
   const variants = BANK[key];
   if (!variants) return pseudo; // fallback: usa o pseudocódigo do motor
   const lines = variants[lang];
-  // Garante alinhamento: se por algum motivo o tamanho divergir, cai no pseudo.
-  return lines && lines.length === variants.pseudo.length ? lines : variants.pseudo;
+  // O realce usa as linhas do código do motor (`pseudo` recebido). Se a tradução
+  // não tiver o mesmo número de linhas dele, cai no código do motor: um realce
+  // desalinhado seria pior do que mostrar o pseudocódigo.
+  return lines && lines.length === pseudo.length ? lines : pseudo;
 }
