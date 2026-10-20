@@ -108,8 +108,10 @@ export function LabWorkspace({
 
   // Fila de passos do roteiro automático (Observar e Prever).
   const scriptQueue = useRef<ScriptStep[]>([]);
-  // Estado em que o Observar terminou, herdado pelo Prever.
-  const observeResult = useRef<number[] | null>(null);
+  // Estado em que o Observar terminou, herdado pelo Prever. Um por estrutura e
+  // tipo de lista: o Prever da lista não pode herdar o resultado da pilha.
+  const observeResult = useRef<Partial<Record<string, number[]>>>({});
+  const resultKey = (st: Structure, k: ListKind) => (st === "linkedList" ? `${st}:${k}` : st);
   // Progresso visível do roteiro: "operação atual de total" e a legenda.
   const [scriptProgress, setScriptProgress] = useState<{ index: number; total: number; caption: string } | null>(null);
   const scriptTotal = useRef(0);
@@ -159,7 +161,9 @@ export function LabWorkspace({
     // do estado real que acabou de ser produzido (op.final).
     if (st === "observar" || st === "prever") {
       // Guarda o estado final já: se for o último, o Prever herda daqui.
-      if (st === "observar") observeResult.current = op.final.map((n) => n.value);
+      if (st === "observar") {
+        observeResult.current[resultKey(op.structure, op.variant ?? "simples")] = op.final.map((n) => n.value);
+      }
       if (scriptQueue.current.length > 0) {
         // Não encadeia sozinho: o aluno controla o ritmo e pede a próxima operação.
         setPendingNext(op.final);
@@ -227,7 +231,7 @@ export function LabWorkspace({
       return;
     }
     if (st === "prever") {
-      const base = observeResult.current ?? observeScript(structure).initial;
+      const base = observeResult.current[resultKey(structure, kind)] ?? observeScript(structure).initial;
       const baseNodes = nodesFromValues(base);
       scriptQueue.current = [...previewScript(structure)];
       scriptTotal.current = scriptQueue.current.length;
