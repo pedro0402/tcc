@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { PrismaClient } from "@prisma/client";
 import { createApp } from "./createApp";
+import { rateLimit } from "./rateLimit";
 
 const app = createApp();
 const db = new PrismaClient();
@@ -66,6 +67,31 @@ describe("tokens", () => {
     expect(res.status).toBe(200);
     const ok = await request(app).get("/events").set("Authorization", `Bearer ${res.body.accessToken}`);
     expect(ok.status).toBe(200);
+  });
+});
+
+describe("limite de tentativas", () => {
+  it("bloqueia com 429 depois do máximo", async () => {
+    const limited = createApp({ limits: { login: { windowMs: 60_000, max: 2 } } });
+    const body = { email: `rl-${uniq()}@example.com`, password: "errada12" };
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) statuses.push((await request(limited).post("/auth/login").send(body)).status);
+    expect(statuses).toEqual([401, 401, 429]);
+  });
+
+  it("a janela reinicia depois do tempo", () => {
+    let t = 0;
+    const mw = rateLimit({ windowMs: 1000, max: 1 }, () => "k", () => t);
+    const codes: number[] = [];
+    const res = { setHeader: () => {}, status: (c: number) => (codes.push(c), { json: () => {} }) };
+    let passed = 0;
+    const next = () => void passed++;
+    mw({} as never, res as never, next);
+    mw({} as never, res as never, next);
+    t = 1001;
+    mw({} as never, res as never, next);
+    expect(passed).toBe(2);
+    expect(codes).toEqual([429]);
   });
 });
 

@@ -35,4 +35,6 @@ export const config = {
   jwtSecret: resolveJwtSecret(),
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
   port: Number(process.env.PORT ?? 3001),
+  // Número de proxies na frente do servidor (para req.ip correto no rate limit).
+  trustProxy: Number(process.env.TRUST_PROXY ?? 0),
 };

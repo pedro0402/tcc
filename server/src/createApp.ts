@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { config } from "./config";
 import { eventSchema, eventsBodySchema } from "./events";
+import { rateLimit, type RateLimitOptions } from "./rateLimit";
 
 const prisma = new PrismaClient();
 
@@ -60,8 +61,34 @@ function asyncHandler(
   };
 }
 
-export function createApp() {
+export interface AppOptions {
+  limits?: {
+    login?: RateLimitOptions;
+    loginPerIp?: RateLimitOptions;
+    register?: RateLimitOptions;
+    refresh?: RateLimitOptions;
+  };
+}
+
+// Limites pensados para uso em sala: muitos alunos podem sair pelo mesmo IP,
+// então o teto por IP é folgado e o aperto fica na combinação IP + email.
+const DEFAULT_LIMITS = {
+  login: { windowMs: 15 * 60_000, max: 10 },
+  loginPerIp: { windowMs: 15 * 60_000, max: 200 },
+  register: { windowMs: 15 * 60_000, max: 50 },
+  refresh: { windowMs: 60_000, max: 60 },
+} satisfies Required<NonNullable<AppOptions["limits"]>>;
+
+const ipOf = (req: express.Request) => req.ip ?? "unknown";
+const bodyEmail = (req: express.Request) => {
+  const raw = (req.body as { email?: unknown } | undefined)?.email;
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+};
+
+export function createApp(options: AppOptions = {}) {
+  const limits = { ...DEFAULT_LIMITS, ...options.limits };
   const app = express();
+  if (config.trustProxy > 0) app.set("trust proxy", config.trustProxy);
   app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json({ limit: "100kb" }));
 
@@ -69,6 +96,7 @@ export function createApp() {
 
   app.post(
     "/auth/register",
+    rateLimit(limits.register, ipOf),
     asyncHandler(async (req, res) => {
       const parsed = z
         .object({
@@ -95,6 +123,8 @@ export function createApp() {
 
   app.post(
     "/auth/login",
+    rateLimit(limits.loginPerIp, ipOf),
+    rateLimit(limits.login, (req) => `${ipOf(req)}|${bodyEmail(req)}`),
     asyncHandler(async (req, res) => {
       const parsed = z
         .object({
@@ -121,6 +151,7 @@ export function createApp() {
 
   app.post(
     "/auth/refresh",
+    rateLimit(limits.refresh, ipOf),
     asyncHandler(async (req, res) => {
       const parsed = z.object({ refreshToken: z.string() }).safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
