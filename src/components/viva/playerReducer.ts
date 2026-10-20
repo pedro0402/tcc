@@ -253,16 +253,17 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
     case "SET_SPEED":
       return { ...s, speed: a.speed };
 
+    // Desligar um modo fecha a pergunta/comentário que ele tinha aberto.
     case "SET_PREDICT_MODE":
-      return { ...s, predictMode: a.on };
+      return { ...s, predictMode: a.on, asking: a.on ? s.asking : null };
 
     case "SET_CONFIDENCE_MODE":
       return { ...s, confidenceMode: a.on };
 
     case "SET_DO_MODE":
-      return { ...s, doMode: a.on };
+      return { ...s, doMode: a.on, doAsking: a.on ? s.doAsking : null };
 
     case "SET_EXAMPLE_MODE":
-      return { ...s, exampleMode: a.on };
+      return { ...s, exampleMode: a.on, examplePaused: a.on ? s.examplePaused : null };
   }
 }

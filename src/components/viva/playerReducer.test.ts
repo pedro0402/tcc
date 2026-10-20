@@ -409,4 +409,20 @@ describe("correções do player", () => {
     expect(s.examplePaused).toBe(PRED_STEP);
     expect(s.playing).toBe(false);
   });
+
+  it("desligar um modo fecha a pergunta que ele abriu", () => {
+    const s = run(atQuestion(), { type: "SET_PREDICT_MODE", on: false });
+    expect(s.asking).toBeNull();
+    expect(run(s, { type: "NEXT" }).idx).toBe(PRED_STEP);
+
+    const ex = run(
+      initialPlayerState,
+      { type: "START", op: pushOp(), autoPlay: false, exampleStops: { 1: "c" } },
+      { type: "SET_EXAMPLE_MODE", on: true },
+      { type: "SET_PREDICT_MODE", on: false },
+      { type: "NEXT" },
+    );
+    expect(ex.examplePaused).toBe(1);
+    expect(run(ex, { type: "SET_EXAMPLE_MODE", on: false }).examplePaused).toBeNull();
+  });
 });
