@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { auth, login, register } from "../../api/progressClient";
-import { handleLogin } from "../../learning/bootstrap";
+import { handleLogin, handleLogout } from "../../learning/bootstrap";
 import styles from "./AuthBar.module.css";
 
 export function AuthBar() {
@@ -25,8 +25,8 @@ export function AuthBar() {
         <span>Conta conectada — progresso sincroniza com o servidor.</span>
         <button
           type="button"
-          onClick={() => {
-            auth().logout();
+          onClick={async () => {
+            await handleLogout();
             setLoggedIn(false);
             setMessage("Sessão encerrada.");
           }}

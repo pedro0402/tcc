@@ -160,6 +160,8 @@ export interface EventStore {
    * computador compartilhado, o histórico de uma pessoa suba para a conta de outra.
    */
   bindSyncOwner(userId: string): void;
+  /** Conta a que o cursor de envio está ligado (null = nunca ligado). */
+  getSyncOwner(): string | null;
   /** Importa o progresso do formato antigo, uma única vez. Devolve quantos eventos entraram. */
   migrateLegacy(): number;
   clear(): void;
@@ -238,6 +240,14 @@ export function createEventStore(
         storage.setItem(SYNC_KEY, lastId);
       } catch {
         // Na pior hipótese reenviamos; o servidor ignora duplicados.
+      }
+    },
+
+    getSyncOwner() {
+      try {
+        return storage.getItem(OWNER_KEY);
+      } catch {
+        return null;
       }
     },
 

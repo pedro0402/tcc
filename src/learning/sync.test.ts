@@ -1,6 +1,43 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEventStore, memoryStorage, type NewEvent } from "./events";
-import { createEventSync, userIdFromToken, type SendResult } from "./sync";
+import {
+  ANON_OWNER,
+  bindExistingSession,
+  createEventSync,
+  releaseSyncOwner,
+  userIdFromToken,
+  type SendResult,
+} from "./sync";
+
+const tokenFor = (userId: string) => `x.${btoa(JSON.stringify({ userId })).replace(/=+$/, "")}.y`;
+
+describe("dono do cursor ao entrar e sair", () => {
+  it("token antigo sem dono gravado não envia o histórico anterior", () => {
+    const store = createEventStore(memoryStorage());
+    store.log({ approach: "ativa", kind: "quiz", activityId: "q" });
+    bindExistingSession(store, tokenFor("A"));
+    expect(store.getSyncOwner()).toBe("A");
+    expect(store.pending()).toEqual([]);
+  });
+
+  it("com dono já gravado, não mexe no cursor", () => {
+    const store = createEventStore(memoryStorage());
+    store.bindSyncOwner("A");
+    const e = store.log({ approach: "ativa", kind: "quiz", activityId: "q" });
+    bindExistingSession(store, tokenFor("A"));
+    expect(store.pending().map((x) => x.id)).toEqual([e.id]);
+  });
+
+  it("A sai, outra pessoa usa anônima, A entra de novo: nada da outra pessoa sobe", () => {
+    const store = createEventStore(memoryStorage());
+    store.bindSyncOwner("A");
+    releaseSyncOwner(store);
+    expect(store.getSyncOwner()).toBe(ANON_OWNER);
+    store.log({ approach: "ativa", kind: "quiz", activityId: "de-B" });
+    store.bindSyncOwner("A");
+    expect(store.pending()).toEqual([]);
+  });
+});
 
 const ev: NewEvent = { approach: "ativa", kind: "quiz", activityId: "q1", correct: true };
 

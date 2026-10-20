@@ -57,6 +57,26 @@ export function createEventSync({ store, send, delayMs = 2000, batchSize = 100 }
   return { flush, start };
 }
 
+/** Dono do cursor quando ninguém está logado (após sair ou a sessão vencer). */
+export const ANON_OWNER = "__anon__";
+
+/**
+ * Sessão que já existia antes do recurso de "dono" (token salvo, dono nunca gravado):
+ * liga o cursor à conta agora, para o histórico anterior do navegador não subir.
+ */
+export function bindExistingSession(store: EventStore, token: string | null): void {
+  const userId = userIdFromToken(token);
+  if (userId && store.getSyncOwner() === null) store.bindSyncOwner(userId);
+}
+
+/**
+ * Ao sair: o que for feito daqui em diante (talvez por outra pessoa) não sobe para
+ * a conta que saiu, nem quando ela entrar de novo neste navegador.
+ */
+export function releaseSyncOwner(store: EventStore): void {
+  store.bindSyncOwner(ANON_OWNER);
+}
+
 /** Lê o payload de um JWT, sem validar assinatura (quem valida é o servidor). */
 export function jwtPayload(token: string | null): Record<string, unknown> | null {
   if (!token) return null;
