@@ -122,6 +122,15 @@ export function LabWorkspace({
   // Identifica a configuração de estágio atual. Em StrictMode o efeito monta
   // duas vezes; timeouts de uma configuração antiga são descartados por este id.
   const runId = useRef(0);
+  // Timeout que dispara a primeira operação do roteiro (limpo ao sair da tela).
+  const firstTimer = useRef<number | undefined>(undefined);
+  useEffect(
+    () => () => {
+      runId.current++;
+      window.clearTimeout(firstTimer.current);
+    },
+    [],
+  );
 
   // Estado do estágio Fazer e Desafio.
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -205,10 +214,12 @@ export function LabWorkspace({
   // começam vazios com uma meta.
   const setupStage = useCallback((st: Stage) => {
     const id = ++runId.current; // invalida timeouts de uma configuração anterior
-    const scheduleFirst = (base: Node[]) =>
-      setTimeout(() => {
+    window.clearTimeout(firstTimer.current);
+    const scheduleFirst = (base: Node[]) => {
+      firstTimer.current = window.setTimeout(() => {
         if (runId.current === id) runNextScripted(base);
       }, 700);
+    };
     setExplained(null);
     setGoalDone(false);
     setScriptProgress(null);
