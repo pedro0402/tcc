@@ -10,7 +10,7 @@ import type { Node, Op, Step } from "./engine";
 export interface DoStep {
   /** Índice do passo (em op.steps) que esta pergunta revela. */
   stepIndex: number;
-  /** Ponteiro que muda (ex.: "topo", "cabeca", "atual", "novo.prox"). */
+  /** Ponteiro nomeado que muda (ex.: "topo", "cabeca", "atual", "novo"). */
   pointer: string;
   /** Resposta: id do nó de destino, ou null. */
   answerId: number | null;
@@ -38,6 +38,10 @@ function pointerTargets(step: Step): Record<string, number | null> {
  * em que um ponteiro de referência passa a apontar para outro destino.
  * Ponteiros auxiliares de leitura (atual, anterior, alvo, ultimo, i) entram,
  * pois é justamente o percurso que o aluno precisa acompanhar.
+ *
+ * Só ponteiros nomeados (step.pointers) viram pergunta. As religações entre nós
+ * (novo.prox, atual.prox, ant) não: essas o estágio Prever já pergunta, com
+ * alternativas e explicação do engano.
  */
 export function deriveDoSteps(op: Op): DoStep[] {
   const steps = op.steps;
@@ -49,7 +53,6 @@ export function deriveDoSteps(op: Op): DoStep[] {
       const had = pointer in before;
       const changed = !had || before[pointer] !== target;
       if (!changed) continue;
-      // Evita perguntar sobre ponteiros que só aparecem para sumir no mesmo passo.
       out.push({
         stepIndex: i,
         pointer,
