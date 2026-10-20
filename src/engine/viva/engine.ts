@@ -6,7 +6,7 @@
 // anterior e depois confere a resposta no desenho.
 
 import type { MisconceptionId } from "../../content/misconceptions";
-import type { Links, ListKind } from "./links";
+import { chain, insertSlot, patch, type Links, type ListKind } from "./links";
 
 export type Node = { id: number; value: number };
 
@@ -285,20 +285,30 @@ export const listCode = {
   ],
 };
 
+/**
+ * Monta a operação da lista simples. Todo passo ganha `links`: os que não
+ * declaram ligações próprias mostram a cadeia bem formada dos seus nós; os
+ * passos intermediários (nó criado, religação feita pela metade) declaram as
+ * ligações reais daquele momento, para o desenho não antecipar o resultado.
+ */
 const listOp = (name: string, code: string[], final: Node[], steps: Step[]): Op => ({
   name,
   structure: "linkedList",
   code,
   final,
-  steps,
+  steps: steps.map((s) => (s.links ? s : { ...s, links: chain(s.nodes.length, "simples") })),
 });
+
+/** Cadeia simples de `n` nós. */
+const simple = (n: number): Links => chain(n, "simples");
 
 export function listInsertHead(list: Node[], value: number): Op {
   const n = mk(value);
   const nl = [n, ...list];
   return listOp("inserirInicio", listCode.insertHead, nl, [
     { line: 0, nodes: list, pointers: { cabeca: list.length ? 0 : null }, highlight: [], message: `inserirInicio(${value})`, vars: { valor: `${value}` } },
-    { line: 1, nodes: nl, pointers: { cabeca: list.length ? 1 : null, novo: 0 }, highlight: [n.id], message: `Novo nó ${value} criado.`, vars: {} },
+    // Recém-criado: o novo nó ainda não aponta para ninguém.
+    { line: 1, nodes: nl, links: insertSlot(simple(list.length), 0), pointers: { cabeca: list.length ? 1 : null, novo: 0 }, highlight: [n.id], message: `Novo nó ${value} criado, ainda sem ligação.`, vars: {} },
     { line: 2, nodes: nl, pointers: { cabeca: list.length ? 1 : null, novo: 0 }, highlight: [n.id], message: `novo.prox aponta para a cabeça atual (${valOrNull(list[0])}).`, vars: { "novo.prox": valOrNull(list[0]) } },
     { line: 3, nodes: nl, pointers: { cabeca: 0 }, highlight: [], message: `A cabeça agora é ${value}.`, vars: { cabeca: `${value}` },
       predict: ask(
@@ -323,19 +333,21 @@ export function listInsertTail(list: Node[], value: number): Op {
   const n = mk(value);
   const nl = [...list, n];
   const head = list.length ? 0 : null;
+  // Do passo da criação até a religação, o novo nó aparece no fim, desligado.
+  const open = insertSlot(simple(list.length), list.length);
   const s: Step[] = [
     { line: 0, nodes: list, pointers: { cabeca: head }, highlight: [], message: `inserirFim(${value})`, vars: {} },
-    { line: 1, nodes: list, pointers: { cabeca: head }, highlight: [], message: `Novo nó ${value} criado (ainda desconectado).`, vars: {} },
-    { line: 2, nodes: list, pointers: { cabeca: head }, highlight: [], message: list.length ? "A lista não está vazia." : "Lista vazia: o novo nó vira a cabeça.", vars: { "cabeca == null": `${!list.length}` } },
+    { line: 1, nodes: nl, links: open, pointers: { cabeca: head, novo: list.length }, highlight: [n.id], message: `Novo nó ${value} criado (ainda desconectado).`, vars: {} },
+    { line: 2, nodes: nl, links: open, pointers: { cabeca: head, novo: list.length }, highlight: [], message: list.length ? "A lista não está vazia." : "Lista vazia: o novo nó vira a cabeça.", vars: { "cabeca == null": `${!list.length}` } },
   ];
   if (!list.length) {
     s.push({ line: 2, nodes: nl, pointers: { cabeca: 0 }, highlight: [n.id], message: `cabeca = ${value}.`, vars: {} });
     return listOp("inserirFim", code, nl, s);
   }
-  s.push({ line: 3, nodes: list, pointers: { cabeca: 0, atual: 0 }, highlight: [list[0].id], message: "atual começa na cabeça.", vars: { atual: `${list[0].value}` } });
+  s.push({ line: 3, nodes: nl, links: open, pointers: { cabeca: 0, atual: 0 }, highlight: [list[0].id], message: "atual começa na cabeça.", vars: { atual: `${list[0].value}` } });
   for (let i = 0; i < list.length - 1; i++) {
-    s.push({ line: 4, nodes: list, pointers: { cabeca: 0, atual: i }, highlight: [list[i].id], message: `atual.prox (${list[i + 1].value}) não é null, continuamos.`, vars: { atual: `${list[i].value}` } });
-    s.push({ line: 5, nodes: list, pointers: { cabeca: 0, atual: i + 1 }, highlight: [list[i + 1].id], message: `atual avança para ${list[i + 1].value}.`, vars: { atual: `${list[i + 1].value}` },
+    s.push({ line: 4, nodes: nl, links: open, pointers: { cabeca: 0, atual: i }, highlight: [list[i].id], message: `atual.prox (${list[i + 1].value}) não é null, continuamos.`, vars: { atual: `${list[i].value}` } });
+    s.push({ line: 5, nodes: nl, links: open, pointers: { cabeca: 0, atual: i + 1 }, highlight: [list[i + 1].id], message: `atual avança para ${list[i + 1].value}.`, vars: { atual: `${list[i + 1].value}` },
       predict: i === 0 ? ask(
         "atual.prox != null. O que acontece?",
         "atual avança para o próximo nó",
@@ -348,7 +360,7 @@ export function listInsertTail(list: Node[], value: number): Op {
       ) : undefined });
   }
   const last = list.length - 1;
-  s.push({ line: 4, nodes: list, pointers: { cabeca: 0, atual: last }, highlight: [list[last].id], message: "atual.prox é null: chegamos ao último nó.", vars: { "atual.prox": "null" } });
+  s.push({ line: 4, nodes: nl, links: open, pointers: { cabeca: 0, atual: last }, highlight: [list[last].id], message: "atual.prox é null: chegamos ao último nó.", vars: { "atual.prox": "null" } });
   s.push({ line: 6, nodes: nl, pointers: { cabeca: 0, atual: last }, highlight: [n.id], message: `O último nó passa a apontar para ${value}.`, vars: {} });
   return listOp("inserirFim", code, nl, s);
 }
@@ -377,8 +389,13 @@ export function listInsertAt(list: Node[], pos: number, value: number): Op {
   const a = pos - 1;
   const n = mk(value);
   const withN = [...list.slice(0, pos), n, ...list.slice(pos)];
-  s.push({ line: 5, nodes: list, pointers: { cabeca: 0, atual: a }, highlight: [list[a].id], message: `atual está na posição ${a}. Criamos o nó ${value}.`, vars: {} });
-  s.push({ line: 6, nodes: withN, pointers: { cabeca: 0, atual: a, novo: pos }, highlight: [n.id], message: `novo.prox aponta para ${valOrNull(list[pos])} (evita perder o resto da lista).`, vars: {},
+  // Nó recém-criado, sem ligação; atual ainda aponta para o seguinte original.
+  const open = insertSlot(simple(list.length), pos);
+  // Depois de novo.prox = atual.prox: o novo já aponta para o resto, mas atual
+  // ainda não aponta para o novo (é isso que a previsão pergunta).
+  const half = patch(open, { prox: { [pos]: pos < list.length ? pos + 1 : null } });
+  s.push({ line: 5, nodes: withN, links: open, pointers: { cabeca: 0, atual: a, novo: pos }, highlight: [list[a].id, n.id], message: `atual está na posição ${a}. Criamos o nó ${value}, ainda sem ligação.`, vars: {} });
+  s.push({ line: 6, nodes: withN, links: half, pointers: { cabeca: 0, atual: a, novo: pos }, highlight: [n.id], message: `novo.prox aponta para ${valOrNull(list[pos])} (evita perder o resto da lista).`, vars: {},
     predict: ask(
       "Qual ligação deve ser feita primeiro?",
       "novo.prox = atual.prox",
@@ -414,7 +431,8 @@ export function listRemoveAt(list: Node[], pos: number): Op {
   ];
   for (let i = 0; i < pos - 1; i++) s.push({ line: 4, nodes: list, pointers: { cabeca: 0, anterior: i + 1 }, highlight: [list[i + 1].id], message: `anterior avança para ${list[i + 1].value}.`, vars: { i: `${i + 1}` } });
   s.push({ line: 5, nodes: list, pointers: { cabeca: 0, anterior: pos - 1, alvo: pos }, highlight: [list[pos].id], message: `alvo = ${list[pos].value}.`, vars: {} });
-  s.push({ line: 6, nodes: list, pointers: { cabeca: 0, anterior: pos - 1 }, highlight: [], removing: list[pos].id, message: `anterior pula o alvo e aponta para ${valOrNull(list[pos + 1])}.`, vars: {},
+  // anterior já pula o alvo; o alvo ainda aponta para o seguinte, mas ninguém o alcança.
+  s.push({ line: 6, nodes: list, links: patch(simple(list.length), { prox: { [pos - 1]: pos + 1 < list.length ? pos + 1 : null } }), pointers: { cabeca: 0, anterior: pos - 1 }, highlight: [], removing: list[pos].id, message: `anterior pula o alvo e aponta para ${valOrNull(list[pos + 1])}.`, vars: {},
     predict: ask(
       "Como desligamos o alvo?",
       "anterior.prox = alvo.prox",
@@ -481,7 +499,8 @@ export function listRemoveValue(list: Node[], value: number): Op {
   }
   const target = list[i + 1];
   s.push({ line: 4, nodes: list, pointers: { cabeca: 0, anterior: i, alvo: i + 1 }, highlight: [target.id], message: `anterior.prox guarda ${value}: encontramos o alvo.`, vars: { "anterior.prox.valor": `${value}` } });
-  s.push({ line: 7, nodes: list, pointers: { cabeca: 0, anterior: i }, highlight: [], removing: target.id, message: `anterior pula o alvo e aponta para ${valOrNull(list[i + 2])}.`, vars: { "anterior.prox": valOrNull(list[i + 2]) },
+  // anterior já pula o alvo; o alvo ainda aponta para o seguinte, mas ninguém o alcança.
+  s.push({ line: 7, nodes: list, links: patch(simple(list.length), { prox: { [i]: i + 2 < list.length ? i + 2 : null } }), pointers: { cabeca: 0, anterior: i }, highlight: [], removing: target.id, message: `anterior pula o alvo e aponta para ${valOrNull(list[i + 2])}.`, vars: { "anterior.prox": valOrNull(list[i + 2]) },
     predict: ask(
       "Como desligamos o alvo?",
       "anterior.prox = anterior.prox.prox",
