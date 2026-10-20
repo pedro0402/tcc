@@ -103,3 +103,21 @@ describe("record* gravam no log de eventos", () => {
     expect(eventStore().getEvents()[0]).toMatchObject({ kind: "self-explanation", correct: false });
   });
 });
+
+describe("texto livre da autoexplicação", () => {
+  it("JSON válido mas fora do formato não impede gravar", async () => {
+    const { vi } = await import("vitest");
+    const { memoryStorage } = await import("../learning/events");
+    const ls = memoryStorage();
+    ls.setItem("ds-visualizer-self-explanations-v1", "{}");
+    vi.stubGlobal("localStorage", ls);
+    try {
+      recordSelfExplanation("stack", "push", "o topo muda", undefined);
+      const saved = JSON.parse(ls.getItem("ds-visualizer-self-explanations-v1")!);
+      expect(Array.isArray(saved)).toBe(true);
+      expect(saved[0].text).toBe("o topo muda");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

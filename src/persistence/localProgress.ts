@@ -130,8 +130,14 @@ export function recordSelfExplanation(
   try {
     if (typeof localStorage === "undefined") return;
     const raw = localStorage.getItem(SELF_EXPLAIN_KEY);
-    const list: Array<{ ts: string; structure: string; operation: string; variant?: string; text: string }> =
-      raw ? JSON.parse(raw) : [];
+    let list: Array<{ ts: string; structure: string; operation: string; variant?: string; text: string }> = [];
+    try {
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      // JSON válido mas fora do formato (ex.: "{}") não pode travar a gravação para sempre.
+      if (Array.isArray(parsed)) list = parsed;
+    } catch {
+      // Conteúdo corrompido: recomeça a lista.
+    }
     list.push({ ts: new Date().toISOString(), structure, operation, variant, text: trimmed.slice(0, 500) });
     localStorage.setItem(SELF_EXPLAIN_KEY, JSON.stringify(list.slice(-200)));
   } catch {
