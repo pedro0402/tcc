@@ -266,12 +266,15 @@ export function LabWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, structure, kind]);
 
-  // Relógio regressivo do Desafio.
+  // Relógio regressivo do Desafio. Depende só de "está correndo": cada passo do
+  // aluno muda `desafio`, e recriar o intervalo a cada mudança descartava a
+  // fração de segundo já passada (o relógio atrasava).
+  const desafioRunning = stage === "desafio" && desafio?.status === "running";
   useEffect(() => {
-    if (stage !== "desafio" || !desafio || desafio.status !== "running") return;
+    if (!desafioRunning) return;
     const t = window.setInterval(() => setDesafio((d) => (d ? tick(d) : d)), 1000);
     return () => window.clearInterval(t);
-  }, [stage, desafio]);
+  }, [desafioRunning]);
 
   const L = listOps(kind);
   // No Fazer e no Desafio, só as operações da meta ficam liberadas.
