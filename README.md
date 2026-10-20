@@ -23,7 +23,7 @@ npx prisma db push
 npm run dev
 ```
 
-O servidor não sobe sem `JWT_SECRET`; em produção o segredo precisa ter pelo menos 32 bytes. Login e registro têm limite de tentativas (429).
+O servidor não sobe sem `JWT_SECRET`; em produção o segredo precisa ter pelo menos 32 bytes. Login e registro têm limite de tentativas (429). Emails são guardados em minúsculas; para normalizar contas antigas, rode `npm run db:normalize-emails` (mostra o que mudaria) e depois `npm run db:normalize-emails -- --apply`.
 
 Endpoints: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /progress`, `GET /progress`, `POST /quiz-attempts`, `GET /quiz-attempts/summary`, `POST /events` (lote de até 100 eventos de aprendizagem, idempotente) e `GET /events`.
 

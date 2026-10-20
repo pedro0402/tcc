@@ -70,6 +70,35 @@ describe("tokens", () => {
   });
 });
 
+describe("validação de credenciais", () => {
+  it("recusa senha acima de 72 bytes (limite do bcrypt)", async () => {
+    const res = await request(app)
+      .post("/auth/register")
+      .send({ email: `long-${uniq()}@example.com`, password: "y".repeat(73) });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("password_too_long");
+  });
+
+  it("senhas com o mesmo prefixo de 72 bytes não se autenticam", async () => {
+    const email = `pref-${uniq()}@example.com`;
+    const base = "y".repeat(70);
+    await request(app).post("/auth/register").send({ email, password: `${base}AA` });
+    const res = await request(app).post("/auth/login").send({ email, password: `${base}AAZZZ` });
+    expect(res.status).toBe(401);
+  });
+
+  it("email não diferencia maiúsculas", async () => {
+    const id = uniq();
+    const first = await request(app).post("/auth/register").send({ email: `Caixa-${id}@Example.com`, password: "secret12" });
+    expect(first.status).toBe(201);
+    expect(first.body.email).toBe(`caixa-${id}@example.com`);
+    const dup = await request(app).post("/auth/register").send({ email: `caixa-${id}@example.com`, password: "secret12" });
+    expect(dup.status).toBe(409);
+    const login = await request(app).post("/auth/login").send({ email: ` CAIXA-${id}@EXAMPLE.COM `, password: "secret12" });
+    expect(login.status).toBe(200);
+  });
+});
+
 describe("limite de tentativas", () => {
   it("bloqueia com 429 depois do máximo", async () => {
     const limited = createApp({ limits: { login: { windowMs: 60_000, max: 2 } } });
@@ -131,6 +160,20 @@ describe("auth and progress API", () => {
       .get("/quiz-attempts/summary")
       .set("Authorization", `Bearer ${token}`);
     expect(summary.body.total).toBeGreaterThan(0);
+  });
+
+  it("recusa textos longos demais em progresso e quiz", async () => {
+    const long = "x".repeat(81);
+    const p = await request(app)
+      .post("/progress")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ structure: long, operation: "push" });
+    expect(p.status).toBe(400);
+    const q = await request(app)
+      .post("/quiz-attempts")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ questionId: long, isCorrect: true });
+    expect(q.status).toBe(400);
   });
 });
 

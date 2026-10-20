@@ -61,6 +61,23 @@ function asyncHandler(
   };
 }
 
+// O bcrypt ignora o que passa de 72 bytes: senhas maiores são recusadas.
+const BCRYPT_MAX_BYTES = 72;
+const fitsBcrypt = (s: string) => Buffer.byteLength(s, "utf8") <= BCRYPT_MAX_BYTES;
+
+const emailSchema = z.string().trim().toLowerCase().email().max(254);
+const shortText = z.string().min(1).max(80);
+
+const registerSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(6).refine(fitsBcrypt, { message: "password_too_long" }),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().max(254),
+  password: z.string().min(1).max(1024),
+});
+
 export interface AppOptions {
   limits?: {
     login?: RateLimitOptions;
@@ -98,14 +115,17 @@ export function createApp(options: AppOptions = {}) {
     "/auth/register",
     rateLimit(limits.register, ipOf),
     asyncHandler(async (req, res) => {
-      const parsed = z
-        .object({
-          email: z.string().email(),
-          password: z.string().min(6),
-        })
-        .safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+      const parsed = registerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const tooLong = parsed.error.issues.some((i) => i.message === "password_too_long");
+        return res.status(400).json({ error: tooLong ? "password_too_long" : "invalid_body" });
+      }
       const { email, password } = parsed.data;
+
+      // Contas antigas podem ter sido gravadas com maiúsculas: compara sem caixa.
+      const clash = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM User WHERE lower(email) = ${email} LIMIT 1`;
+      if (clash.length) return res.status(409).json({ error: "email_taken" });
 
       const passwordHash = await bcrypt.hash(password, 10);
       try {
@@ -126,20 +146,22 @@ export function createApp(options: AppOptions = {}) {
     rateLimit(limits.loginPerIp, ipOf),
     rateLimit(limits.login, (req) => `${ipOf(req)}|${bodyEmail(req)}`),
     asyncHandler(async (req, res) => {
-      const parsed = z
-        .object({
-          email: z.string().email(),
-          password: z.string().min(6),
-        })
-        .safeParse(req.body);
+      const parsed = loginSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+      const { password } = parsed.data;
+      // Senha maior que o limite do bcrypt nunca é válida (o registro recusa).
+      if (!fitsBcrypt(password)) return res.status(401).json({ error: "invalid_credentials" });
 
-      const user = await prisma.user.findUnique({
-        where: { email: parsed.data.email },
-      });
+      const raw = parsed.data.email;
+      const normalized = raw.toLowerCase();
+      // Primeiro o email normalizado; depois o texto exato, para contas antigas
+      // gravadas com maiúsculas (até rodar scripts/normalize-emails.ts).
+      const user =
+        (await prisma.user.findUnique({ where: { email: normalized } })) ??
+        (raw !== normalized ? await prisma.user.findUnique({ where: { email: raw } }) : null);
       if (!user) return res.status(401).json({ error: "invalid_credentials" });
 
-      const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
+      const ok = await bcrypt.compare(password, user.passwordHash);
       if (!ok) return res.status(401).json({ error: "invalid_credentials" });
 
       return res.json({
@@ -153,7 +175,7 @@ export function createApp(options: AppOptions = {}) {
     "/auth/refresh",
     rateLimit(limits.refresh, ipOf),
     asyncHandler(async (req, res) => {
-      const parsed = z.object({ refreshToken: z.string() }).safeParse(req.body);
+      const parsed = z.object({ refreshToken: z.string().max(4096) }).safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
       // Só refresh token renova: um access token vazado não se perpetua.
       const payload = verifyToken(parsed.data.refreshToken, "refresh");
@@ -170,7 +192,7 @@ export function createApp(options: AppOptions = {}) {
     asyncHandler(async (req, res) => {
       const user = (req as AuthedRequest).user;
       const parsed = z
-        .object({ structure: z.string(), operation: z.string() })
+        .object({ structure: shortText, operation: shortText })
         .safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
@@ -204,7 +226,7 @@ export function createApp(options: AppOptions = {}) {
     asyncHandler(async (req, res) => {
       const user = (req as AuthedRequest).user;
       const parsed = z
-        .object({ questionId: z.string(), isCorrect: z.boolean() })
+        .object({ questionId: shortText, isCorrect: z.boolean() })
         .safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
 
