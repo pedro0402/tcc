@@ -2,7 +2,7 @@
 
 ## Brand direction
 
-Estruturalab is a teaching-focused interface for learning data structures through visual reasoning. The brand should feel:
+EstruturaViva is a teaching-focused interface for learning data structures through visual reasoning. The brand should feel:
 
 - intelligent
 - precise

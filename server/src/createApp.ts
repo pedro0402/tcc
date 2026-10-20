@@ -1,30 +1,39 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import cors from "cors";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { config } from "./config";
+import { eventSchema, eventsBodySchema } from "./events";
+import { rateLimit, type RateLimitOptions } from "./rateLimit";
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:5173";
 
-type JwtPayload = { userId: string; email: string };
+type TokenType = "access" | "refresh";
+type JwtPayload = { userId: string; email: string; typ: TokenType };
+type AuthedRequest = express.Request & { user: JwtPayload };
 
-function signAccess(user: { id: string; email: string }) {
+// Em segundos: 15 minutos e 7 dias.
+const TOKEN_TTL: Record<TokenType, number> = { access: 15 * 60, refresh: 7 * 24 * 60 * 60 };
+
+function signToken(user: { id: string; email: string }, typ: TokenType) {
   return jwt.sign(
-    { userId: user.id, email: user.email } satisfies JwtPayload,
-    JWT_SECRET,
-    { expiresIn: "15m" }
+    { userId: user.id, email: user.email, typ } satisfies JwtPayload,
+    config.jwtSecret,
+    { expiresIn: TOKEN_TTL[typ] }
   );
 }
 
-function signRefresh(user: { id: string; email: string }) {
-  return jwt.sign(
-    { userId: user.id, email: user.email } satisfies JwtPayload,
-    JWT_SECRET,
-    { expiresIn: "7d" }
-  );
+/** Valida assinatura, validade e o tipo do token. Tokens sem `typ` são recusados. */
+function verifyToken(token: string, typ: TokenType): JwtPayload | null {
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as Partial<JwtPayload>;
+    if (payload.typ !== typ || typeof payload.userId !== "string") return null;
+    return payload as JwtPayload;
+  } catch {
+    return null;
+  }
 }
 
 function requireAuth(
@@ -36,136 +45,285 @@ function requireAuth(
   if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "unauthorized" });
   }
-  try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as JwtPayload;
-    (req as express.Request & { user: JwtPayload }).user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: "invalid_token" });
-  }
+  // Só access token autentica: um refresh token não vale como Bearer.
+  const payload = verifyToken(header.slice(7), "access");
+  if (!payload) return res.status(401).json({ error: "invalid_token" });
+  (req as AuthedRequest).user = payload;
+  next();
 }
 
-export function createApp() {
+/** Express 4 não captura promises rejeitadas: encaminha o erro para o middleware final. */
+function asyncHandler(
+  fn: (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<unknown>
+): express.RequestHandler {
+  return (req, res, next) => {
+    fn(req, res, next).catch(next);
+  };
+}
+
+// O bcrypt ignora o que passa de 72 bytes: senhas maiores são recusadas.
+const BCRYPT_MAX_BYTES = 72;
+const fitsBcrypt = (s: string) => Buffer.byteLength(s, "utf8") <= BCRYPT_MAX_BYTES;
+
+const emailSchema = z.string().trim().toLowerCase().email().max(254);
+const shortText = z.string().min(1).max(80);
+
+const registerSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(6).refine(fitsBcrypt, { message: "password_too_long" }),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().max(254),
+  password: z.string().min(1).max(1024),
+});
+
+export interface AppOptions {
+  limits?: {
+    login?: RateLimitOptions;
+    loginPerIp?: RateLimitOptions;
+    register?: RateLimitOptions;
+    refresh?: RateLimitOptions;
+  };
+}
+
+// Limites pensados para uso em sala: muitos alunos podem sair pelo mesmo IP,
+// então o teto por IP é folgado e o aperto fica na combinação IP + email.
+const DEFAULT_LIMITS = {
+  login: { windowMs: 15 * 60_000, max: 10 },
+  loginPerIp: { windowMs: 15 * 60_000, max: 200 },
+  register: { windowMs: 15 * 60_000, max: 50 },
+  refresh: { windowMs: 60_000, max: 60 },
+} satisfies Required<NonNullable<AppOptions["limits"]>>;
+
+const ipOf = (req: express.Request) => req.ip ?? "unknown";
+const bodyEmail = (req: express.Request) => {
+  const raw = (req.body as { email?: unknown } | undefined)?.email;
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+};
+
+export function createApp(options: AppOptions = {}) {
+  const limits = { ...DEFAULT_LIMITS, ...options.limits };
   const app = express();
-  app.use(cors({ origin: CORS_ORIGIN }));
-  app.use(express.json());
+  if (config.trustProxy > 0) app.set("trust proxy", config.trustProxy);
+  app.use(cors({ origin: config.corsOrigin }));
+  app.use(express.json({ limit: "100kb" }));
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
-  app.post("/auth/register", async (req, res) => {
-    const parsed = z
-      .object({
-        email: z.string().email(),
-        password: z.string().min(6),
-      })
-      .safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  app.post(
+    "/auth/register",
+    rateLimit(limits.register, ipOf),
+    asyncHandler(async (req, res) => {
+      const parsed = registerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const tooLong = parsed.error.issues.some((i) => i.message === "password_too_long");
+        return res.status(400).json({ error: tooLong ? "password_too_long" : "invalid_body" });
+      }
+      const { email, password } = parsed.data;
 
-    const existing = await prisma.user.findUnique({
-      where: { email: parsed.data.email },
-    });
-    if (existing) return res.status(409).json({ error: "email_taken" });
+      // Contas antigas podem ter sido gravadas com maiúsculas: compara sem caixa.
+      const clash = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM User WHERE lower(email) = ${email} LIMIT 1`;
+      if (clash.length) return res.status(409).json({ error: "email_taken" });
 
-    const passwordHash = await bcrypt.hash(parsed.data.password, 10);
-    const user = await prisma.user.create({
-      data: { email: parsed.data.email, passwordHash },
-    });
-    return res.status(201).json({ id: user.id, email: user.email });
-  });
+      const passwordHash = await bcrypt.hash(password, 10);
+      try {
+        // O índice único resolve a corrida entre dois registros simultâneos.
+        const user = await prisma.user.create({ data: { email, passwordHash } });
+        return res.status(201).json({ id: user.id, email: user.email });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+          return res.status(409).json({ error: "email_taken" });
+        }
+        throw err;
+      }
+    })
+  );
 
-  app.post("/auth/login", async (req, res) => {
-    const parsed = z
-      .object({
-        email: z.string().email(),
-        password: z.string().min(6),
-      })
-      .safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  app.post(
+    "/auth/login",
+    rateLimit(limits.loginPerIp, ipOf),
+    rateLimit(limits.login, (req) => `${ipOf(req)}|${bodyEmail(req)}`),
+    asyncHandler(async (req, res) => {
+      const parsed = loginSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+      const { password } = parsed.data;
+      // Senha maior que o limite do bcrypt nunca é válida (o registro recusa).
+      if (!fitsBcrypt(password)) return res.status(401).json({ error: "invalid_credentials" });
 
-    const user = await prisma.user.findUnique({
-      where: { email: parsed.data.email },
-    });
-    if (!user) return res.status(401).json({ error: "invalid_credentials" });
+      const raw = parsed.data.email;
+      const normalized = raw.toLowerCase();
+      // Primeiro o email normalizado; depois o texto exato, para contas antigas
+      // gravadas com maiúsculas (até rodar scripts/normalize-emails.ts).
+      const user =
+        (await prisma.user.findUnique({ where: { email: normalized } })) ??
+        (raw !== normalized ? await prisma.user.findUnique({ where: { email: raw } }) : null);
+      if (!user) return res.status(401).json({ error: "invalid_credentials" });
 
-    const ok = await bcrypt.compare(parsed.data.password, user.passwordHash);
-    if (!ok) return res.status(401).json({ error: "invalid_credentials" });
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) return res.status(401).json({ error: "invalid_credentials" });
 
-    return res.json({
-      accessToken: signAccess(user),
-      refreshToken: signRefresh(user),
-    });
-  });
-
-  app.post("/auth/refresh", async (req, res) => {
-    const parsed = z.object({ refreshToken: z.string() }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
-    try {
-      const payload = jwt.verify(
-        parsed.data.refreshToken,
-        JWT_SECRET
-      ) as JwtPayload;
-      const user = await prisma.user.findUnique({
-        where: { id: payload.userId },
+      return res.json({
+        accessToken: signToken(user, "access"),
+        refreshToken: signToken(user, "refresh"),
       });
+    })
+  );
+
+  app.post(
+    "/auth/refresh",
+    rateLimit(limits.refresh, ipOf),
+    asyncHandler(async (req, res) => {
+      const parsed = z.object({ refreshToken: z.string().max(4096) }).safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+      // Só refresh token renova: um access token vazado não se perpetua.
+      const payload = verifyToken(parsed.data.refreshToken, "refresh");
+      if (!payload) return res.status(401).json({ error: "invalid_token" });
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } });
       if (!user) return res.status(401).json({ error: "invalid_token" });
-      return res.json({ accessToken: signAccess(user) });
-    } catch {
-      return res.status(401).json({ error: "invalid_token" });
+      return res.json({ accessToken: signToken(user, "access") });
+    })
+  );
+
+  app.post(
+    "/progress",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const parsed = z
+        .object({ structure: shortText, operation: shortText })
+        .safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+      const row = await prisma.operationProgress.create({
+        data: {
+          userId: user.userId,
+          structure: parsed.data.structure,
+          operation: parsed.data.operation,
+        },
+      });
+      return res.status(201).json(row);
+    })
+  );
+
+  app.get(
+    "/progress",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const rows = await prisma.operationProgress.findMany({
+        where: { userId: user.userId },
+        orderBy: { completedAt: "desc" },
+      });
+      return res.json(rows);
+    })
+  );
+
+  app.post(
+    "/quiz-attempts",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const parsed = z
+        .object({ questionId: shortText, isCorrect: z.boolean() })
+        .safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+
+      const row = await prisma.quizAttempt.create({
+        data: {
+          userId: user.userId,
+          questionId: parsed.data.questionId,
+          isCorrect: parsed.data.isCorrect,
+        },
+      });
+      return res.status(201).json(row);
+    })
+  );
+
+  app.get(
+    "/quiz-attempts/summary",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const [total, correct] = await Promise.all([
+        prisma.quizAttempt.count({ where: { userId: user.userId } }),
+        prisma.quizAttempt.count({ where: { userId: user.userId, isCorrect: true } }),
+      ]);
+      return res.json({ total, correct });
+    })
+  );
+
+  // Eventos de aprendizagem em lote. Idempotente: reenviar o mesmo evento não duplica,
+  // e o id do cliente só vale dentro da conta de quem enviou.
+  app.post(
+    "/events",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const body = eventsBodySchema.safeParse(req.body);
+      if (!body.success) return res.status(400).json({ error: "invalid_body" });
+
+      let accepted = 0;
+      let rejected = 0;
+      for (const raw of body.data.events) {
+        const parsed = eventSchema.safeParse(raw);
+        if (!parsed.success) {
+          rejected++;
+          continue;
+        }
+        const { id, ts, ...rest } = parsed.data;
+        await prisma.learningEvent.upsert({
+          where: { userId_clientId: { userId: user.userId, clientId: id } },
+          create: { userId: user.userId, clientId: id, occurredAt: new Date(ts), ...rest },
+          update: {},
+        });
+        accepted++;
+      }
+      // Nada aproveitável no lote: 422 para o cliente não tratar como sucesso.
+      const status = accepted === 0 && rejected > 0 ? 422 : 201;
+      return res.status(status).json({ accepted, rejected });
+    })
+  );
+
+  app.get(
+    "/events",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = (req as AuthedRequest).user;
+      const rows = await prisma.learningEvent.findMany({
+        where: { userId: user.userId },
+        orderBy: { occurredAt: "desc" },
+        take: 500,
+      });
+      return res.json(rows);
+    })
+  );
+
+  // Middleware de erro final: nenhuma exceção derruba o processo nem vaza stack.
+  app.use(
+    (
+      err: unknown,
+      _req: express.Request,
+      res: express.Response,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      _next: express.NextFunction
+    ) => {
+      const type = (err as { type?: string } | null)?.type;
+      if (type === "entity.parse.failed") return res.status(400).json({ error: "invalid_json" });
+      if (type === "entity.too.large") return res.status(413).json({ error: "payload_too_large" });
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        // Email já usado (corrida no registro).
+        if (err.code === "P2002") return res.status(409).json({ error: "conflict" });
+        // Chave estrangeira ou registro ausente: o usuário do token não existe mais.
+        if (err.code === "P2003" || err.code === "P2025") {
+          return res.status(401).json({ error: "invalid_token" });
+        }
+      }
+      console.error(err);
+      return res.status(500).json({ error: "internal_error" });
     }
-  });
-
-  app.post("/progress", requireAuth, async (req, res) => {
-    const user = (req as express.Request & { user: JwtPayload }).user;
-    const parsed = z
-      .object({ structure: z.string(), operation: z.string() })
-      .safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
-
-    const row = await prisma.operationProgress.create({
-      data: {
-        userId: user.userId,
-        structure: parsed.data.structure,
-        operation: parsed.data.operation,
-      },
-    });
-    return res.status(201).json(row);
-  });
-
-  app.get("/progress", requireAuth, async (req, res) => {
-    const user = (req as express.Request & { user: JwtPayload }).user;
-    const rows = await prisma.operationProgress.findMany({
-      where: { userId: user.userId },
-      orderBy: { completedAt: "desc" },
-    });
-    return res.json(rows);
-  });
-
-  app.post("/quiz-attempts", requireAuth, async (req, res) => {
-    const user = (req as express.Request & { user: JwtPayload }).user;
-    const parsed = z
-      .object({ questionId: z.string(), isCorrect: z.boolean() })
-      .safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
-
-    const row = await prisma.quizAttempt.create({
-      data: {
-        userId: user.userId,
-        questionId: parsed.data.questionId,
-        isCorrect: parsed.data.isCorrect,
-      },
-    });
-    return res.status(201).json(row);
-  });
-
-  app.get("/quiz-attempts/summary", requireAuth, async (req, res) => {
-    const user = (req as express.Request & { user: JwtPayload }).user;
-    const attempts = await prisma.quizAttempt.findMany({
-      where: { userId: user.userId },
-    });
-    const total = attempts.length;
-    const correct = attempts.filter((a) => a.isCorrect).length;
-    return res.json({ total, correct });
-  });
+  );
 
   return app;
 }

@@ -7,6 +7,7 @@
     "dev": "tsx watch src/app.ts",
     "start": "tsx src/app.ts",
     "db:push": "prisma db push",
+    "db:normalize-emails": "tsx scripts/normalize-emails.ts",
     "test": "vitest run"
   },
   "dependencies": {

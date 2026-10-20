@@ -21,7 +21,8 @@ export function LivePreview({ script = HOME_LIVE_SCRIPT }: LivePreviewProps) {
       </header>
 
       <div className={styles.stage} aria-hidden="true">
-        {kind === "stack" ? <StackDemo frame={frame} /> : <LinkedListDemo frame={frame} />}
+        {/* Roteiro sem frames: mostra só o cabeçalho e o código. */}
+        {frame ? kind === "stack" ? <StackDemo frame={frame} /> : <LinkedListDemo frame={frame} /> : null}
       </div>
 
       <pre className={styles.code}>

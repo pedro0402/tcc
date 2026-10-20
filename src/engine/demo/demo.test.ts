@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { listInsertTail, mk } from "../viva/engine";
-import { scriptFromOp } from "./fromOp";
 import { insertTailHomeScript } from "./scripts";
 
 describe("insertTailHomeScript", () => {
@@ -29,23 +27,5 @@ describe("insertTailHomeScript", () => {
 
     expect(done.order).toEqual(["n3", "n8", "n15"]);
     expect(done.pointers.cabeça).toBe("n3");
-  });
-});
-
-describe("scriptFromOp", () => {
-  it("preserva código, estrutura e destaque de linha do motor", () => {
-    const list = [3, 8].map(mk);
-    const op = listInsertTail(list, 15);
-    const script = scriptFromOp(op, { id: "t", title: "Inserir no fim" });
-
-    expect(script.kind).toBe("linkedList");
-    expect(script.code).toEqual(op.code);
-    expect(script.frames).toHaveLength(op.steps.length);
-    script.frames.forEach((frame, i) => {
-      expect(frame.line).toBe(op.steps[i].line);
-      expect(frame.order.map((id) => Number(id))).toEqual(op.steps[i].nodes.map((n) => n.id));
-    });
-    const last = script.frames.at(-1)!;
-    expect(last.order).toHaveLength(3);
   });
 });

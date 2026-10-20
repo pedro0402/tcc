@@ -15,6 +15,7 @@ model User {
   createdAt    DateTime            @default(now())
   progress     OperationProgress[]
   quizAttempts QuizAttempt[]
+  learningEvents LearningEvent[]
 }
 
 model OperationProgress {
@@ -33,4 +34,35 @@ model QuizAttempt {
   isCorrect  Boolean
   answeredAt DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id])
+}
+
+// Eventos de aprendizagem enviados pelo cliente (previsões, quiz, operações...).
+// clientId é o id gerado no navegador; a combinação (userId, clientId) torna o envio
+// idempotente e impede que um usuário sobrescreva o evento de outro.
+model LearningEvent {
+  id            String   @id @default(uuid())
+  clientId      String
+  userId        String
+  approach      String
+  naps          String?
+  kind          String
+  activityId    String
+  concept       String?
+  structure     String?
+  variant       String?
+  operation     String?
+  correct       Boolean?
+  confidence    Int?
+  hintsUsed     Int?
+  attempts      Int?
+  misconception String?
+  stage         String?
+  pair          Boolean?
+  occurredAt    DateTime
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, clientId])
+  @@index([userId, occurredAt])
+  @@index([activityId])
 }
