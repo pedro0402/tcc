@@ -11,7 +11,7 @@ npm run dev
 
 Abre em `http://localhost:5173`.
 
-Variável opcional: `VITE_API_URL` (padrão `http://localhost:3001`).
+Variável opcional: `VITE_API_URL`. Sem ela, o `npm run dev` usa `http://localhost:3001` e o build de produção chama a API na mesma origem do site.
 
 ## Rodar a API (progresso / auth)
 

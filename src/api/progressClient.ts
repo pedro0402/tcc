@@ -1,7 +1,10 @@
 import { browserStorage, type KeyValueStorage } from "../learning/events";
 import { jwtPayload } from "../learning/sync";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+// Sem VITE_API_URL: em desenvolvimento usa a API local; no build de produção usa
+// a mesma origem do site (API atrás do mesmo domínio/proxy), nunca o localhost do aluno.
+const API_BASE =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:3001" : "");
 
 export const ACCESS_KEY = "ds-visualizer-token";
 export const REFRESH_KEY = "ds-visualizer-refresh-token";
