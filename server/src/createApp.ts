@@ -4,11 +4,10 @@ import cors from "cors";
 import express from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { config } from "./config";
 import { eventSchema, eventsBodySchema } from "./events";
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:5173";
 
 type JwtPayload = { userId: string; email: string };
 type AuthedRequest = express.Request & { user: JwtPayload };
@@ -16,7 +15,7 @@ type AuthedRequest = express.Request & { user: JwtPayload };
 function signAccess(user: { id: string; email: string }) {
   return jwt.sign(
     { userId: user.id, email: user.email } satisfies JwtPayload,
-    JWT_SECRET,
+    config.jwtSecret,
     { expiresIn: "15m" }
   );
 }
@@ -24,7 +23,7 @@ function signAccess(user: { id: string; email: string }) {
 function signRefresh(user: { id: string; email: string }) {
   return jwt.sign(
     { userId: user.id, email: user.email } satisfies JwtPayload,
-    JWT_SECRET,
+    config.jwtSecret,
     { expiresIn: "7d" }
   );
 }
@@ -39,7 +38,7 @@ function requireAuth(
     return res.status(401).json({ error: "unauthorized" });
   }
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(header.slice(7), config.jwtSecret) as JwtPayload;
     (req as AuthedRequest).user = payload;
     next();
   } catch {
@@ -58,7 +57,7 @@ function asyncHandler(
 
 export function createApp() {
   const app = express();
-  app.use(cors({ origin: CORS_ORIGIN }));
+  app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json({ limit: "100kb" }));
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -122,7 +121,7 @@ export function createApp() {
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
       let payload: JwtPayload;
       try {
-        payload = jwt.verify(parsed.data.refreshToken, JWT_SECRET) as JwtPayload;
+        payload = jwt.verify(parsed.data.refreshToken, config.jwtSecret) as JwtPayload;
       } catch {
         return res.status(401).json({ error: "invalid_token" });
       }

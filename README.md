@@ -18,9 +18,12 @@ Variável opcional: `VITE_API_URL` (padrão `http://localhost:3001`).
 ```bash
 cd server
 npm install
+cp .env.example .env   # defina JWT_SECRET (openssl rand -hex 32)
 npx prisma db push
 npm run dev
 ```
+
+O servidor não sobe sem `JWT_SECRET`; em produção o segredo precisa ter pelo menos 32 bytes.
 
 Endpoints: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /progress`, `GET /progress`, `POST /quiz-attempts`, `GET /quiz-attempts/summary`, `POST /events` (lote de até 100 eventos de aprendizagem, idempotente) e `GET /events`.
 
