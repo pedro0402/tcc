@@ -74,6 +74,18 @@
   color: var(--amber);
 }
 
+.tips {
+  display: grid;
+  gap: 12px;
+}
+
+.tips h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .tipGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -20,6 +20,10 @@
   }
 }
 
+.heroText {
+  min-width: 0;
+}
+
 .kicker {
   display: inline-flex;
   align-items: center;

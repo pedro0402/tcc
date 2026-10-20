@@ -13,6 +13,9 @@ export default defineConfig(({ command, mode }) => {
       pool: "forks",
       fileParallelism: false,
       include: ["src/**/*.test.ts"],
+      // Só os imports ?raw (usados no teste de CSS modules) passam pelo Vite;
+      // os demais CSS seguem como proxy, sem mudar o nome das classes nos testes.
+      css: { include: [/\.css\?raw$/] },
     },
   };
 });
