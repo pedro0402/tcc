@@ -341,7 +341,17 @@ export function listInsertTail(list: Node[], value: number): Op {
     { line: 2, nodes: nl, links: open, pointers: { cabeca: head, novo: list.length }, highlight: [], message: list.length ? "A lista não está vazia." : "Lista vazia: o novo nó vira a cabeça.", vars: { "cabeca == null": `${!list.length}` } },
   ];
   if (!list.length) {
-    s.push({ line: 2, nodes: nl, pointers: { cabeca: 0 }, highlight: [n.id], message: `cabeca = ${value}.`, vars: {} });
+    s.push({ line: 2, nodes: nl, pointers: { cabeca: 0 }, highlight: [n.id], message: `cabeca = ${value}.`, vars: {},
+      predict: ask(
+        "A lista está vazia. O que acontece com o novo nó?",
+        "cabeca passa a apontar para o novo nó",
+        [
+          { text: "Percorremos a lista até o fim", misconception: "null-significado" },
+          { text: "Nada: não há onde ligar", misconception: "no-vs-ponteiro" },
+          "novo.prox aponta para a cabeça",
+        ],
+        { id: "list.insertTail.vazia", concept: "lista.cabeca", explain: "Sem nenhum nó, não há último para ligar: o novo nó vira a cabeça e a operação termina." },
+      ) });
     return listOp("inserirFim", code, nl, s);
   }
   s.push({ line: 3, nodes: nl, links: open, pointers: { cabeca: 0, atual: 0 }, highlight: [list[0].id], message: "atual começa na cabeça.", vars: { atual: `${list[0].value}` } });
@@ -421,7 +431,21 @@ export function listRemoveAt(list: Node[], pos: number): Op {
   if (pos === 0) {
     return listOp("removerEm", code, rest, [
       { line: 0, nodes: list, pointers: { cabeca: 0 }, highlight: [], message: "removerEm(0)", vars: {} },
-      { line: 1, nodes: list, pointers: { cabeca: list.length > 1 ? 1 : null }, highlight: [], removing: list[0].id, message: "cabeca avança para o próximo nó.", vars: {} },
+      { line: 1, nodes: list, pointers: { cabeca: list.length > 1 ? 1 : null }, highlight: [], removing: list[0].id, message: list.length > 1 ? "cabeca avança para o próximo nó." : "cabeca avança para null: a lista fica vazia.", vars: { cabeca: valOrNull(list[1]) },
+        predict: ask(
+          "pos == 0: o alvo é a própria cabeça. O que acontece?",
+          "cabeca passa a apontar para cabeca.prox",
+          [
+            { text: "Percorremos até o fim da lista", misconception: "ordem-religacao-remocao" },
+            { text: "O nó da cabeça é apagado e cabeca continua nele", misconception: "no-vs-ponteiro" },
+            { text: "cabeca.prox recebe null", misconception: "null-significado" },
+          ],
+          {
+            id: "list.removeAt.cabeca",
+            concept: "lista.cabeca",
+            explain: "Remover a cabeça não percorre nada: basta a cabeça avançar para o próximo nó. Se era o único, ela vira null e a lista fica vazia.",
+          },
+        ) },
       { line: 1, nodes: rest, pointers: { cabeca: rest.length ? 0 : null }, highlight: [], message: `Nó ${list[0].value} removido.`, vars: {} },
     ]);
   }

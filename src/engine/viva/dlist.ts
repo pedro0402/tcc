@@ -137,7 +137,19 @@ export function dInsertHead(list: Node[], value: number): Op {
   } else {
     s.push(
       listStep({ line: 3, nodes: nl, links: withProx, pointers: at({ novo: 0 }), highlight: [n.id], message: "cabeca é null: não há nó para ligar de volta.", vars: { "cabeca == null": "true" } }),
-      listStep({ line: 4, nodes: nl, links: withProx, pointers: { cabeca: null, cauda: 0, novo: 0 }, highlight: [n.id], message: "Lista vazia: o novo nó também é a cauda." }),
+      listStep({
+        line: 4, nodes: nl, links: withProx, pointers: { cabeca: null, cauda: 0, novo: 0 }, highlight: [n.id], message: "Lista vazia: o novo nó também é a cauda.",
+        predict: ask(
+          "A lista estava vazia (cabeca == null). E a cauda?",
+          "cauda = novo",
+          [
+            { text: "cabeca.ant = novo", misconception: "null-significado" },
+            { text: "A cauda continua null", misconception: "dupla-um-lado" },
+            "novo.prox = novo",
+          ],
+          { id: "dlist.insertHead.vazia", concept: "dupla.ant", explain: "Com um único nó, ele é ao mesmo tempo o primeiro e o último: cabeça e cauda apontam para ele." },
+        ),
+      }),
     );
   }
   s.push(
@@ -194,7 +206,19 @@ export function dInsertTail(list: Node[], value: number): Op {
   } else {
     s.push(
       listStep({ line: 3, nodes: nl, links: withAnt, pointers: at({ novo: m }), highlight: [n.id], message: "cauda é null: não há nó para ligar.", vars: { "cauda == null": "true" } }),
-      listStep({ line: 4, nodes: nl, links: withAnt, pointers: { cabeca: 0, cauda: null, novo: 0 }, highlight: [n.id], message: "Lista vazia: o novo nó também é a cabeça." }),
+      listStep({
+        line: 4, nodes: nl, links: withAnt, pointers: { cabeca: 0, cauda: null, novo: 0 }, highlight: [n.id], message: "Lista vazia: o novo nó também é a cabeça.",
+        predict: ask(
+          "A lista estava vazia (cauda == null). E a cabeça?",
+          "cabeca = novo",
+          [
+            { text: "cauda.prox = novo", misconception: "null-significado" },
+            { text: "A cabeça continua null", misconception: "dupla-um-lado" },
+            "percorrer a lista até o fim",
+          ],
+          { id: "dlist.insertTail.vazia", concept: "dupla.ant", explain: "Com um único nó, ele é ao mesmo tempo o primeiro e o último: cabeça e cauda apontam para ele." },
+        ),
+      }),
     );
   }
   s.push(
@@ -393,7 +417,19 @@ export function dRemoveValue(list: Node[], value: number): Op {
     i++;
   }
   if (i >= m) {
-    s.push(listStep({ line: 4, nodes: list, links: chain(m, "dupla"), pointers: ends(m, { alvo: null }), message: m ? `${value} não está na lista. Nada muda.` : "Lista vazia: nada a remover.", error: true, vars: { alvo: "null" } }));
+    s.push(listStep({
+      line: 4, nodes: list, links: chain(m, "dupla"), pointers: ends(m, { alvo: null }), message: m ? `${value} não está na lista. Nada muda.` : "Lista vazia: nada a remover.", error: true, vars: { alvo: "null" },
+      predict: ask(
+        m ? `O laço terminou com alvo == null: ${value} não apareceu. E agora?` : "A lista está vazia: alvo já começa null. E agora?",
+        "Nada é removido: a função retorna",
+        [
+          { text: "Remove-se o último nó", misconception: "no-vs-ponteiro" },
+          { text: "cauda passa a ser null", misconception: "null-significado" },
+          "Volta-se ao início da lista",
+        ],
+        { id: "dlist.removeValue.ausente", concept: "lista.percurso", explain: "alvo == null quer dizer que o percurso passou do fim sem achar o valor. Não há o que religar: a lista fica como estava." },
+      ),
+    }));
     return dOp("removerValor", code, list, s);
   }
   s.push(listStep({ line: 2, nodes: list, links: chain(m, "dupla"), pointers: ends(m, { alvo: i }), highlight: [list[i].id], message: `Achamos ${value} na posição ${i}.`, vars: { "alvo.valor": `${value}` } }));

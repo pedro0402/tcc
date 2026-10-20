@@ -138,6 +138,19 @@ function walkToLast(
 }
 
 /* --------------------------- inserirInicio --------------------------- */
+/** Pergunta do ramo "lista vazia" das inserções na circular. */
+const emptyCircleQuestion = (): Predict =>
+  ask(
+    "A lista está vazia. Como o novo nó entra numa lista circular?",
+    "Vira a cabeça e aponta para si mesmo",
+    [
+      { text: "Vira a cabeça e novo.prox = null", misconception: "circular-parada" },
+      { text: "Percorremos até o último nó", misconception: "circular-religar-cabeca" },
+      { text: "Nada acontece: não há onde ligar", misconception: "no-vs-ponteiro" },
+    ],
+    { id: "clist.insert.vazia", concept: "circular.retorno", explain: "Na circular nenhum prox é null. Sozinho, o nó é o primeiro e o último ao mesmo tempo, então aponta para si mesmo." },
+  );
+
 export function cInsertHead(list: Node[], value: number): Op {
   const m = list.length;
   const n = mk(value);
@@ -153,6 +166,7 @@ export function cInsertHead(list: Node[], value: number): Op {
     s.push(listStep({
       line: 2, nodes: nl, links: patch(open, { prox: { 0: 0 } }), pointers: { cabeca: 0, novo: 0 }, highlight: [n.id],
       message: "Lista vazia: cabeca = novo e novo.prox aponta para o próprio nó.",
+      predict: emptyCircleQuestion(),
     }));
     return cOp("inserirInicio", clistCode.insertHead, nl, s);
   }
@@ -203,6 +217,7 @@ export function cInsertTail(list: Node[], value: number): Op {
     s.push(listStep({
       line: 2, nodes: nl, links: patch(open, { prox: { 0: 0 } }), pointers: { cabeca: 0, novo: 0 }, highlight: [n.id],
       message: "Lista vazia: cabeca = novo e novo.prox aponta para o próprio nó.",
+      predict: emptyCircleQuestion(),
     }));
     return cOp("inserirFim", clistCode.insertTail, nl, s);
   }
@@ -311,7 +326,17 @@ export function cRemoveAt(list: Node[], pos: number): Op {
 
   if (m === 1) {
     s.push(
-      listStep({ line: 1, nodes: list, links: c, pointers: { cabeca: 0 }, removing: t.id, message: "O único nó aponta para si mesmo: a lista vai ficar vazia.", vars: { "cabeca.prox == cabeca": "true" } }),
+      listStep({ line: 1, nodes: list, links: c, pointers: { cabeca: 0 }, removing: t.id, message: "O único nó aponta para si mesmo: a lista vai ficar vazia.", vars: { "cabeca.prox == cabeca": "true" },
+        predict: ask(
+          "cabeca.prox == cabeca: só existe um nó. O que acontece ao removê-lo?",
+          "A lista fica vazia: cabeca = null",
+          [
+            { text: "cabeca passa a apontar para cabeca.prox", misconception: "circular-religar-cabeca" },
+            { text: "Percorremos a lista até o último", misconception: "circular-parada" },
+            { text: "O nó continua apontando para si mesmo", misconception: "no-vs-ponteiro" },
+          ],
+          { id: "clist.removeAt.unico", concept: "circular.retorno", explain: "Se o nó aponta para si mesmo, ele é o único. Avançar a cabeça cairia nele de novo; por isso a lista simplesmente fica vazia." },
+        ) }),
       listStep({ line: 1, nodes: [], links: chain(0, "circular"), pointers: { cabeca: null }, message: `Nó ${t.value} removido.` }),
     );
     return cOp("removerEm", code, rest, s);
@@ -399,6 +424,16 @@ export function cRemoveValue(list: Node[], value: number): Op {
     s.push(listStep({
       line: 2, nodes: list, links: c, pointers: { cabeca: 0 }, error: true,
       message: `pos == -1: ${value} não está na lista. Nada muda.`, vars: { pos: "-1" },
+      predict: ask(
+        `A busca deu a volta e voltou à cabeça sem achar ${value}. E agora?`,
+        "Nada é removido: a função retorna",
+        [
+          { text: "Remove-se o último nó", misconception: "no-vs-ponteiro" },
+          { text: "A busca continua girando", misconception: "circular-parada" },
+          "A cabeça passa a ser null",
+        ],
+        { id: "clist.removeValue.ausente", concept: "circular.parada", explain: "Voltar à cabeça significa que a lista inteira foi vista: buscar devolve -1 e nada é removido." },
+      ),
     }));
     return cOp("removerValor", code, list, s);
   }
