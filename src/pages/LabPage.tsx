@@ -60,6 +60,15 @@ export function LabPage() {
     return () => window.removeEventListener("hashchange", onHash);
   });
 
+  // Se o hash mudou com uma operação em andamento, a troca ficou para depois:
+  // ao terminar, a aba volta a refletir a URL.
+  useEffect(() => {
+    if (busy) return;
+    const t = tabFromHash();
+    if (t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
+
   const structure: Structure = tab === "lista" ? "linkedList" : "stack";
 
   return (
