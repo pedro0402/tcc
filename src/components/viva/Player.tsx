@@ -6,15 +6,19 @@ import styles from "./viva.module.css";
 
 export function Controls({ p }: { p: PlayerApi }) {
   const total = p.op?.steps.length ?? 0;
+  // Pergunta, ponteiro ou comentário aberto: só o "Continuar" da caixa avança.
+  const waiting = p.asking !== null || p.doAsking !== null || p.examplePaused !== null;
+  const atEnd = total > 0 && p.idx >= total - 1;
+  const playLabel = p.playing ? "Pausar" : atEnd ? "Reproduzir de novo" : "Reproduzir";
   return (
     <div className={styles.controls}>
       <div className={styles.controlBtns}>
         <Button size="icon" variant="ghost" onClick={p.restart} disabled={!p.op} aria-label="Reiniciar"><Icon name="restart" /></Button>
         <Button size="icon" variant="ghost" onClick={p.prev} disabled={!p.op || p.idx === 0} aria-label="Voltar"><Icon name="prev" /></Button>
-        <Button size="icon" onClick={() => p.setPlaying(!p.playing)} disabled={!p.op || p.asking !== null} aria-label={p.playing ? "Pausar" : "Reproduzir"}>
-          <Icon name={p.playing ? "pause" : "play"} />
+        <Button size="icon" onClick={() => p.setPlaying(!p.playing)} disabled={!p.op || waiting} aria-label={playLabel} title={playLabel}>
+          <Icon name={p.playing ? "pause" : atEnd ? "restart" : "play"} />
         </Button>
-        <Button size="icon" variant="ghost" onClick={p.next} disabled={!p.op || p.asking !== null} aria-label="Avançar"><Icon name="next" /></Button>
+        <Button size="icon" variant="ghost" onClick={p.next} disabled={!p.op || waiting || atEnd} aria-label="Avançar"><Icon name="next" /></Button>
         <Button size="icon" variant="ghost" onClick={p.skip} disabled={!p.busy} aria-label="Pular para o fim"><Icon name="skip" /></Button>
       </div>
       <span className={styles.monoMuted}>passo {total ? p.idx + 1 : 0}/{total}</span>

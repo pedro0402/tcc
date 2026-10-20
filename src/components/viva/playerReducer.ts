@@ -241,8 +241,14 @@ export function playerReducer(s: PlayerState, a: PlayerAction): PlayerState {
     case "DONE":
       return { ...s, finished: true, playing: false };
 
-    case "SET_PLAYING":
-      return { ...s, playing: a.playing };
+    case "SET_PLAYING": {
+      if (!a.playing) return { ...s, playing: false };
+      // Com uma pergunta ou comentário aberto, quem retoma é o botão "Continuar".
+      if (!s.op || s.asking !== null || s.doAsking !== null || s.examplePaused !== null) return s;
+      // Play no último passo reproduz de novo desde o começo.
+      if (s.idx >= s.op.steps.length - 1) return { ...s, idx: 0, exampleSeen: {}, playing: true };
+      return { ...s, playing: true };
+    }
 
     case "SET_SPEED":
       return { ...s, speed: a.speed };

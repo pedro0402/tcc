@@ -381,6 +381,17 @@ describe("correções do player", () => {
     expect(s.score).toEqual({ ok: 0, total: 0 });
   });
 
+  it("play no último passo reproduz de novo desde o começo", () => {
+    const s = run(started(), { type: "SKIP" }, { type: "SET_PLAYING", playing: true });
+    expect(s.idx).toBe(0);
+    expect(s.playing).toBe(true);
+  });
+
+  it("play com pergunta ou comentário aberto não finge tocar", () => {
+    const s = run(atQuestion(), { type: "SET_PLAYING", playing: true });
+    expect(s.playing).toBe(false);
+  });
+
   it("passo-chave do exemplo que também tem previsão: pergunta primeiro, comenta depois", () => {
     let s = run(initialPlayerState, {
       type: "START",
