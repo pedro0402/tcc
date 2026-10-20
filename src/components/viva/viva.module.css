@@ -924,6 +924,10 @@
   line-height: 1.4;
 }
 
+.scriptNext {
+  margin-left: auto;
+}
+
 .sideQuiet {
   padding: 16px;
 }

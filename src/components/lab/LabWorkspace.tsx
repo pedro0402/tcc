@@ -113,6 +113,9 @@ export function LabWorkspace({
   // Progresso visível do roteiro: "operação atual de total" e a legenda.
   const [scriptProgress, setScriptProgress] = useState<{ index: number; total: number; caption: string } | null>(null);
   const scriptTotal = useRef(0);
+  // Quando uma operação do roteiro termina e há mais na fila, guardamos o estado
+  // base e esperamos o aluno pedir a próxima (controle do ritmo). null = nada pendente.
+  const [pendingNext, setPendingNext] = useState<Node[] | null>(null);
   // Identifica a configuração de estágio atual. Em StrictMode o efeito monta
   // duas vezes; timeouts de uma configuração antiga são descartados por este id.
   const runId = useRef(0);
@@ -129,6 +132,7 @@ export function LabWorkspace({
   const runNextScripted = useCallback((base: Node[]) => {
     const q = scriptQueue.current;
     if (q.length === 0) return false;
+    setPendingNext(null);
     const stepDef = q.shift()!;
     const op = opFromSpec(structure, kind, base, stepDef.spec);
     // Mostra "operação atual de total" com a legenda do roteiro.
@@ -157,11 +161,8 @@ export function LabWorkspace({
       // Guarda o estado final já: se for o último, o Prever herda daqui.
       if (st === "observar") observeResult.current = op.final.map((n) => n.value);
       if (scriptQueue.current.length > 0) {
-        const base = op.final;
-        const id = runId.current;
-        setTimeout(() => {
-          if (runId.current === id) runNextScripted(base);
-        }, 600);
+        // Não encadeia sozinho: o aluno controla o ritmo e pede a próxima operação.
+        setPendingNext(op.final);
       } else {
         // Roteiro terminou: deixa o indicador no total e marca como concluído.
         setScriptProgress((prev) => (prev ? { ...prev, index: prev.total } : prev));
@@ -206,6 +207,7 @@ export function LabWorkspace({
     setExplained(null);
     setGoalDone(false);
     setScriptProgress(null);
+    setPendingNext(null);
     scriptQueue.current = [];
     p.setPredictMode(st === "prever");
     // No Fazer o aluno opera livremente até a meta: nada de perguntas de ponteiro.
@@ -412,6 +414,11 @@ export function LabWorkspace({
               Operação {Math.min(scriptProgress.index, scriptProgress.total)} de {scriptProgress.total}
             </span>
             <span className={styles.scriptCaption}>{scriptProgress.caption}</span>
+            {pendingNext && (
+              <Button size="sm" className={styles.scriptNext} onClick={() => runNextScripted(pendingNext)}>
+                Próxima operação
+              </Button>
+            )}
           </div>
         )}
 
