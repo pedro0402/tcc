@@ -164,6 +164,13 @@
   margin-top: 4px;
 }
 
+.fieldError {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--ev-destructive);
+}
+
 .groupTitle {
   margin-bottom: 8px;
   font-size: 0.75rem;

@@ -31,6 +31,7 @@ import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, DoBox, ExampleBox, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
 import { Button, Input } from "../viva/ui";
+import { FIELD_LIMIT, parseIntField } from "./fields";
 import styles from "../viva/viva.module.css";
 
 /** Nome da operação "vazia" que só exibe o estado atual. Não conta como progresso. */
@@ -278,10 +279,13 @@ export function LabWorkspace({
   const can = (id: OpId) => !allowed || allowed.includes(id);
   const any = (...ids: OpId[]) => ids.some(can);
 
-  const v = () => Number.parseInt(val, 10);
-  const ps = () => Number.parseInt(pos, 10);
-  const valid = !Number.isNaN(v());
-  const posValid = !Number.isNaN(ps());
+  // Os botões só ficam ativos com um inteiro válido; v()/ps() só são chamados aí.
+  const valNum = parseIntField(val);
+  const posNum = parseIntField(pos);
+  const valid = valNum !== null;
+  const posValid = posNum !== null;
+  const v = () => valNum as number;
+  const ps = () => posNum as number;
 
   // Painel de operações só aparece quando o aluno opera (Fazer e Desafio).
   const canOperate = stage === "fazer" || stage === "desafio";
@@ -320,12 +324,40 @@ export function LabWorkspace({
           <div className={styles.fields}>
             <label className={styles.fieldLabel}>
               Valor
-              <Input value={val} onChange={(e) => setVal(e.target.value)} type="number" aria-invalid={!valid} />
+              <Input
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                type="number"
+                step={1}
+                min={-FIELD_LIMIT}
+                max={FIELD_LIMIT}
+                aria-invalid={!valid}
+                aria-describedby={valid ? undefined : "lab-val-erro"}
+              />
+              {!valid && (
+                <span id="lab-val-erro" className={styles.fieldError} role="alert">
+                  Use um inteiro entre -{FIELD_LIMIT} e {FIELD_LIMIT}.
+                </span>
+              )}
             </label>
             {isList && any("insertAt", "removeAt") && (
               <label className={styles.fieldLabel}>
                 Posição
-                <Input value={pos} onChange={(e) => setPos(e.target.value)} type="number" min={0} aria-invalid={!posValid} />
+                <Input
+                  value={pos}
+                  onChange={(e) => setPos(e.target.value)}
+                  type="number"
+                  step={1}
+                  min={0}
+                  max={FIELD_LIMIT}
+                  aria-invalid={!posValid}
+                  aria-describedby={posValid ? undefined : "lab-pos-erro"}
+                />
+                {!posValid && (
+                  <span id="lab-pos-erro" className={styles.fieldError} role="alert">
+                    Use um inteiro de 0 a {FIELD_LIMIT}.
+                  </span>
+                )}
               </label>
             )}
           </div>
