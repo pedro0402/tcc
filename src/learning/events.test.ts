@@ -132,6 +132,43 @@ describe("envio ao servidor (pending / markSynced)", () => {
   });
 });
 
+describe("duas abas no mesmo armazenamento", () => {
+  const tabs = () => {
+    const storage = memoryStorage();
+    let n = 0;
+    const newId = () => `t${++n}`;
+    return { storage, a: createEventStore(storage, { newId }), b: createEventStore(storage, { newId }) };
+  };
+
+  it("gravar numa aba não apaga o que a outra gravou (sem esperar o evento storage)", () => {
+    const { a, b } = tabs();
+    a.getEvents(); // a aba A já tem cache
+    const x = b.log(base);
+    const y = a.log(base);
+    expect(a.getEvents().map((e) => e.id)).toEqual([x.id, y.id]);
+  });
+
+  it("cursor avançado em outra aba vale para esta", () => {
+    const { a, b } = tabs();
+    const x = a.log(base);
+    a.pending(); // cursor da memória de A fica no estado inicial
+    b.markSynced(x.id);
+    expect(a.pending()).toEqual([]);
+  });
+
+  it("cursor da memória vale quando a gravação falhou", () => {
+    const storage = memoryStorage();
+    const store = createEventStore(storage, { newId: (() => { let n = 0; return () => `m${++n}`; })() });
+    const x = store.log(base);
+    const y = store.log(base);
+    storage.setItem = () => {
+      throw new Error("cheio");
+    };
+    store.markSynced(x.id);
+    expect(store.pending().map((e) => e.id)).toEqual([y.id]);
+  });
+});
+
 describe("migração do progresso antigo", () => {
   const legacy = {
     completedOperations: [{ structure: "stack", operation: "push", completedAt: "2026-09-01T10:00:00.000Z" }],

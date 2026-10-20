@@ -174,6 +174,15 @@ export function createEventStore(
   const now = deps.now ?? (() => new Date());
   const newId = deps.newId ?? randomId;
   let cache: readonly LearningEvent[] | null = null;
+  // Texto gravado/lido por último: se o armazenamento mudar por fora, o cache é descartado.
+  let lastRaw: string | null = null;
+  const safeGet = (k: string) => {
+    try {
+      return storage.getItem(k);
+    } catch {
+      return lastRaw;
+    }
+  };
   // Cursor também em memória: se a gravação falhar, o envio não repete o mesmo lote para sempre.
   let cursor: string | null | undefined;
   const getCursor = () => (cursor !== undefined ? cursor : (cursor = storage.getItem(SYNC_KEY)));
@@ -186,6 +195,7 @@ export function createEventStore(
     let events: LearningEvent[] = [];
     try {
       const raw = storage.getItem(EVENTS_KEY);
+      lastRaw = raw;
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       if (Array.isArray(parsed)) events = parsed.filter(isEvent);
     } catch {
@@ -199,7 +209,9 @@ export function createEventStore(
     const trimmed = events.length > MAX_EVENTS ? events.slice(events.length - MAX_EVENTS) : events;
     cache = trimmed;
     try {
-      storage.setItem(EVENTS_KEY, JSON.stringify(trimmed));
+      const raw = JSON.stringify(trimmed);
+      storage.setItem(EVENTS_KEY, raw);
+      lastRaw = raw;
     } catch {
       // Sem espaço ou bloqueado: o cache em memória segue valendo nesta sessão.
     }
@@ -211,6 +223,9 @@ export function createEventStore(
 
     log(event) {
       const full: LearningEvent = { ...event, id: event.id ?? newId(), ts: event.ts ?? now().toISOString() };
+      // Relê o armazenamento antes de anexar: outra aba pode ter gravado eventos que
+      // ainda não chegaram pelo evento "storage", e o cache os sobrescreveria.
+      if (safeGet(EVENTS_KEY) !== lastRaw) cache = null;
       write([...read(), full]);
       return full;
     },
@@ -227,7 +242,17 @@ export function createEventStore(
 
     pending() {
       const events = read();
-      const last = getCursor();
+      // O cursor gravado pode ter avançado em outra aba; o da memória vale quando a
+      // gravação falhou. Fica o mais adiantado dos dois.
+      let stored: string | null = null;
+      try {
+        stored = storage.getItem(SYNC_KEY);
+      } catch {
+        // Sem leitura: vale o cursor da memória.
+      }
+      const mem = getCursor();
+      const pos = (id: string | null) => (id ? events.findIndex((e) => e.id === id) : -1);
+      const last = pos(stored) > pos(mem) ? stored : mem;
       if (!last) return [...events];
       const at = events.findIndex((e) => e.id === last);
       // Cursor não encontrado (já saiu do teto de eventos): tudo o que resta é novo.
