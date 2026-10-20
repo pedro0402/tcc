@@ -135,18 +135,73 @@
   min-height: 0;
 }
 
-@media (min-width: 1024px) {
-  .grid {
-    grid-template-columns: 260px 1fr 380px;
-  }
-}
-
 .side {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 20px;
   border-right: 1px solid var(--ev-border);
+}
+
+/*
+ * Tela fixa no desktop: o simulador ocupa exatamente a altura disponível e a
+ * página não rola. Cada coluna é limitada à altura da linha do grid
+ * (min-height: 0) e o desenho encolhe para caber o resto. Só os painéis com
+ * conteúdo longo (código, variáveis) rolam por dentro, se precisarem.
+ * Em telas estreitas as colunas empilham e a rolagem continua necessária.
+ */
+@media (min-width: 1024px) {
+  .root {
+    overflow: hidden;
+  }
+
+  .grid {
+    grid-template-columns: 260px 1fr 380px;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .side,
+  .sideQuiet {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .main {
+    min-height: 0;
+    /* Só entra em ação se a janela for mais baixa que o essencial da coluna. */
+    overflow-y: auto;
+  }
+
+  .main > * {
+    flex-shrink: 0;
+  }
+
+  /* O desenho encolhe para caber (FitToBox): a área não precisa rolar. */
+  .main > .stage {
+    flex: 1 1 0;
+    min-height: 120px;
+    overflow: hidden;
+  }
+
+  /* Seletor composto para vencer o .codeAside base, declarado mais abaixo. */
+  .grid > .codeAside {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .codeAside .code {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  .codeAside .vars {
+    max-height: 40%;
+    overflow-y: auto;
+  }
 }
 
 .fields {
@@ -243,6 +298,25 @@
 .codeAside {
   min-height: 320px;
   border-left: 1px solid var(--ev-border);
+}
+
+/* Área do desenho que encolhe o conteúdo para caber (FitToBox). */
+.fit {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.fitInner {
+  flex-shrink: 0;
+  /* Lista longa quebra em linhas antes de precisar encolher. */
+  max-width: 100%;
+  transform-origin: center center;
 }
 
 /* ---------- Botões / inputs (equivalentes shadcn) ---------- */
@@ -555,7 +629,8 @@
 .codeBody {
   flex: 1;
   margin: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 8px 0;
   font-size: 0.875rem;
   line-height: 1.75rem;
@@ -567,6 +642,15 @@
   display: flex;
   padding: 0 16px;
   transition: background-color 0.15s;
+}
+
+/* Linha longa quebra dentro do painel em vez de criar rolagem lateral. */
+.line > span:last-child,
+.lineOn > span:last-child,
+.lineErr > span:last-child {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .lineOn {
@@ -842,8 +926,13 @@
   line-height: 1.5;
 }
 
+/* Estágios à esquerda, troca de estrutura à direita, dica embaixo. */
 .stageBar {
-  margin: 0 16px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 10px 16px 8px;
 }
 
 .stageSwitch {
@@ -853,10 +942,27 @@
 }
 
 .stageHint {
-  margin: 6px 0 0;
+  order: 3;
+  flex-basis: 100%;
+  margin: 0;
   color: var(--ev-muted-fg);
   font-size: 0.82rem;
   line-height: 1.4;
+}
+
+.stageTools {
+  margin-left: auto;
+}
+
+.stageTools .tabs {
+  margin-left: 0;
+  padding: 2px;
+}
+
+.stageTools .tab,
+.stageTools .tabOn {
+  padding: 4px 12px;
+  font-size: 0.8rem;
 }
 
 .stageProgress {
@@ -1173,4 +1279,111 @@
   border-color: var(--ev-destructive) !important;
   opacity: 0.4;
   transform: translateY(-16px);
+}
+
+/*
+ * Telas mais baixas (notebooks de 768px ou menos de altura útil): compacta
+ * cabeçalho, mensagens, caixas de pergunta e controles para tudo caber sem
+ * rolar. Fica no fim do arquivo para vencer as regras base acima.
+ */
+@media (min-width: 1024px) and (max-height: 860px) {
+  /* A marca já aparece na barra do site; a troca de estrutura fica na barra dos estágios. */
+  .root > .header {
+    display: none;
+  }
+
+  /* Dica do estágio na mesma linha dos botões, quando couber. */
+  .main > .stageBar {
+    gap: 4px 12px;
+    margin: 8px 16px 6px;
+  }
+
+  .main .stageHint {
+    order: 0;
+    flex: 1 1 220px;
+  }
+
+  .main > .scriptBar,
+  .main > .challenge,
+  .main > .challengeDone,
+  .main > .challengeFail {
+    margin-bottom: 6px;
+    padding: 6px 12px;
+  }
+
+  .main .selfExplainInput {
+    height: 3.2em;
+  }
+
+  .main .speed > .textMuted {
+    display: none;
+  }
+
+
+
+  .main > .message,
+  .main > .messageErr {
+    padding: 8px 24px;
+  }
+
+  .main > .stage {
+    padding: 8px 16px;
+    min-height: 72px;
+  }
+
+  .grid > .side {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .main .selfExplainKicker {
+    display: none;
+  }
+
+  .main > .predict,
+  .main > .selfExplain {
+    margin: 8px 16px;
+    padding: 12px;
+  }
+
+  .main .predictQ,
+  .main .selfExplainQ {
+    margin-bottom: 8px;
+  }
+
+  .main .predictFoot {
+    margin-top: 8px;
+  }
+
+  .main .opt {
+    padding: 6px 10px;
+  }
+
+  .main > .controls {
+    padding: 6px 12px;
+    gap: 6px 8px;
+  }
+
+  .main > .controls .size_icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .main .speed .slider {
+    width: 64px;
+  }
+}
+
+/* Notebooks entre 1024 e 1439px: colunas laterais mais estreitas dão espaço
+   ao desenho e deixam os controles numa linha só. */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .grid {
+    grid-template-columns: 220px 1fr 330px;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1365px) {
+  .grid {
+    grid-template-columns: 200px 1fr 310px;
+  }
 }

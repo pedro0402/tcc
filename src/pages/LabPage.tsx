@@ -73,6 +73,7 @@ export function LabPage() {
 
   return (
     <div className={styles.root}>
+      {/* Em janelas baixas este cabeçalho some (a marca já está na barra do site). */}
       <header className={styles.header}>
         <div>
           <h1 className={styles.brand}>
@@ -80,24 +81,26 @@ export function LabPage() {
           </h1>
           <p className={styles.tagline}>Veja o código e a estrutura mudarem juntos — e tente prever o próximo passo.</p>
         </div>
-        <nav className={styles.tabs} role="tablist" aria-label="Estrutura">
-          {(["lista", "pilha"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              disabled={busy && tab !== t}
-              onClick={() => switchTab(t)}
-              className={tab === t ? styles.tabOn : styles.tab}
-            >
-              {t === "lista" ? "Lista encadeada" : "Pilha"}
-            </button>
-          ))}
-        </nav>
       </header>
 
       <LabWorkspace
+        toolbar={
+          <nav className={styles.tabs} role="tablist" aria-label="Estrutura">
+            {(["lista", "pilha"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                disabled={busy && tab !== t}
+                onClick={() => switchTab(t)}
+                className={tab === t ? styles.tabOn : styles.tab}
+              >
+                {t === "lista" ? "Lista encadeada" : "Pilha"}
+              </button>
+            ))}
+          </nav>
+        }
         structure={structure}
         kind={kind}
         onKindChange={setKind}

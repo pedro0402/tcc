@@ -38,6 +38,9 @@ export function Controls({ p }: { p: PlayerApi }) {
   );
 }
 
+/** Quantidade de espaços no começo da linha de código. */
+const indentOf = (line: string) => line.length - line.trimStart().length;
+
 export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boolean }) {
   const [lang, setLang] = useState<CodeLang>("humano");
   const idlePlaceholder =
@@ -75,7 +78,10 @@ export function CodePanel({ p, showVars = true }: { p: PlayerApi; showVars?: boo
               aria-current={on ? "step" : undefined}
             >
               <span className={styles.lineNo}>{i + 1}</span>
-              <span className={on ? styles.lineTextOn : undefined}>{l}</span>
+              {/* O recuo vira margem: se a linha quebrar, a continuação fica alinhada ao texto. */}
+              <span className={on ? styles.lineTextOn : undefined} style={indentOf(l) ? { paddingLeft: `${indentOf(l)}ch` } : undefined}>
+                {l.slice(indentOf(l))}
+              </span>
             </div>
           );
         })}

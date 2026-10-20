@@ -31,6 +31,7 @@ import { usePlayer, type PredictEvent } from "../viva/usePlayer";
 import { CodePanel, Controls, DoBox, ExampleBox, PredictBox } from "../viva/Player";
 import { ListCanvas, StackCanvas, type ListKind } from "../viva/Canvas";
 import { Button, Input } from "../viva/ui";
+import { FitToBox } from "../viva/FitToBox";
 import { FIELD_LIMIT, parseIntField } from "./fields";
 import styles from "../viva/viva.module.css";
 
@@ -72,6 +73,8 @@ export interface LabWorkspaceProps {
   onOpDone?: (op: Op) => void;
   onPredict?: (event: PredictEvent) => void;
   onBusyChange?: (busy: boolean) => void;
+  /** Controles extras na barra dos estágios (ex.: troca de estrutura). */
+  toolbar?: ReactNode;
 }
 
 /**
@@ -88,6 +91,7 @@ export function LabWorkspace({
   onOpDone,
   onPredict,
   onBusyChange,
+  toolbar,
 }: LabWorkspaceProps) {
   const isList = structure === "linkedList";
   const [val, setVal] = useState("42");
@@ -455,6 +459,7 @@ export function LabWorkspace({
             ))}
           </div>
           <p className={styles.stageHint}>{STAGE_HINT[stage]}</p>
+          {toolbar && <div className={styles.stageTools}>{toolbar}</div>}
         </div>
 
         {/* Indicador do roteiro automático (Observar/Prever) */}
@@ -511,11 +516,13 @@ export function LabWorkspace({
           {step?.message}
         </div>
         <div className={styles.stage}>
-          {isList ? (
-            <ListCanvas step={step} kind={kind} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
-          ) : (
-            <StackCanvas step={step} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
-          )}
+          <FitToBox>
+            {isList ? (
+              <ListCanvas step={step} kind={kind} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
+            ) : (
+              <StackCanvas step={step} onPick={p.doAsking !== null && p.doAnswered[p.doAsking] === undefined ? p.answerDo : undefined} />
+            )}
+          </FitToBox>
         </div>
         <ExampleBox p={p} />
         <PredictBox p={p} />
