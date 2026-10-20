@@ -280,7 +280,9 @@ export function createApp(options: AppOptions = {}) {
         });
         accepted++;
       }
-      return res.status(201).json({ accepted, rejected });
+      // Nada aproveitável no lote: 422 para o cliente não tratar como sucesso.
+      const status = accepted === 0 && rejected > 0 ? 422 : 201;
+      return res.status(status).json({ accepted, rejected });
     })
   );
 

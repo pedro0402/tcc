@@ -237,6 +237,12 @@ describe("learning events API", () => {
     expect(res.body).toEqual({ accepted: 1, rejected: 3 });
   });
 
+  it("lote só com eventos inválidos devolve 422", async () => {
+    const res = await post(tokenA, { events: ["lixo", ev("a-bad2", { approach: "inexistente" })] });
+    expect(res.status).toBe(422);
+    expect(res.body).toEqual({ accepted: 0, rejected: 2 });
+  });
+
   it("rejeita corpo fora do formato e lotes grandes demais", async () => {
     expect((await post(tokenA, { events: [] })).status).toBe(400);
     expect((await post(tokenA, { eventos: [ev("z")] })).status).toBe(400);
