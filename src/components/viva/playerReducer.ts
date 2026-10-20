@@ -100,7 +100,13 @@ export function doStepAt(s: PlayerState, n: number): DoStep | undefined {
  * as opções: a previsão fica "travada" até isso acontecer.
  */
 export function needsConfidence(s: PlayerState): boolean {
-  return s.confidenceMode && s.asking !== null && s.confidence[s.asking] === undefined;
+  // Pergunta já respondida não pede confiança (ligar o modo depois não trava a caixa).
+  return (
+    s.confidenceMode &&
+    s.asking !== null &&
+    s.answered[s.asking] === undefined &&
+    s.confidence[s.asking] === undefined
+  );
 }
 
 /** A resposta só vale com uma previsão aberta e ainda sem resposta. */

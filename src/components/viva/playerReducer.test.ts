@@ -359,3 +359,13 @@ describe("fim da operação", () => {
     expect(shouldFireDone(s)).toBe(true);
   });
 });
+
+describe("correções do player", () => {
+  it("ligar 'Pedir confiança' depois de responder não trava a previsão", () => {
+    const s = run(atQuestion(), { type: "ANSWER", choice: 0 }, { type: "SET_CONFIDENCE_MODE", on: true });
+    expect(needsConfidence(s)).toBe(false);
+    const next = run(s, { type: "CONTINUE" });
+    expect(next.asking).toBeNull();
+    expect(next.idx).toBe(PRED_STEP);
+  });
+});
