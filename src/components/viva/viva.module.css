@@ -135,18 +135,73 @@
   min-height: 0;
 }
 
-@media (min-width: 1024px) {
-  .grid {
-    grid-template-columns: 260px 1fr 380px;
-  }
-}
-
 .side {
   display: flex;
   flex-direction: column;
   gap: 20px;
   padding: 20px;
   border-right: 1px solid var(--ev-border);
+}
+
+/*
+ * Tela fixa no desktop: o simulador ocupa exatamente a altura disponível e a
+ * página não rola. Cada coluna é limitada à altura da linha do grid
+ * (min-height: 0) e o desenho encolhe para caber o resto. Só os painéis com
+ * conteúdo longo (código, variáveis) rolam por dentro, se precisarem.
+ * Em telas estreitas as colunas empilham e a rolagem continua necessária.
+ */
+@media (min-width: 1024px) {
+  .root {
+    overflow: hidden;
+  }
+
+  .grid {
+    grid-template-columns: 260px 1fr 380px;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .side,
+  .sideQuiet {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .main {
+    min-height: 0;
+    /* Só entra em ação se a janela for mais baixa que o essencial da coluna. */
+    overflow-y: auto;
+  }
+
+  .main > * {
+    flex-shrink: 0;
+  }
+
+  /* O desenho encolhe para caber (FitToBox): a área não precisa rolar. */
+  .main > .stage {
+    flex: 1 1 0;
+    min-height: 120px;
+    overflow: hidden;
+  }
+
+  /* Seletor composto para vencer o .codeAside base, declarado mais abaixo. */
+  .grid > .codeAside {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .codeAside .code {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  .codeAside .vars {
+    max-height: 40%;
+    overflow-y: auto;
+  }
 }
 
 .fields {
@@ -162,6 +217,13 @@
 
 .fieldLabel .input {
   margin-top: 4px;
+}
+
+.fieldError {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--ev-destructive);
 }
 
 .groupTitle {
@@ -236,6 +298,25 @@
 .codeAside {
   min-height: 320px;
   border-left: 1px solid var(--ev-border);
+}
+
+/* Área do desenho que encolhe o conteúdo para caber (FitToBox). */
+.fit {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.fitInner {
+  flex-shrink: 0;
+  /* Lista longa quebra em linhas antes de precisar encolher. */
+  max-width: 100%;
+  transform-origin: center center;
 }
 
 /* ---------- Botões / inputs (equivalentes shadcn) ---------- */
@@ -548,7 +629,8 @@
 .codeBody {
   flex: 1;
   margin: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 8px 0;
   font-size: 0.875rem;
   line-height: 1.75rem;
@@ -560,6 +642,15 @@
   display: flex;
   padding: 0 16px;
   transition: background-color 0.15s;
+}
+
+/* Linha longa quebra dentro do painel em vez de criar rolagem lateral. */
+.line > span:last-child,
+.lineOn > span:last-child,
+.lineErr > span:last-child {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .lineOn {
@@ -687,6 +778,274 @@
   font-weight: 500;
 }
 
+.predictFoot {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.predictVerdict {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.predictFoot .btn {
+  align-self: flex-end;
+}
+
+.confidence {
+  margin-top: 12px;
+}
+
+.confidenceLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ev-muted-fg);
+  font-size: 0.85rem;
+}
+
+.confidenceOpts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confidenceBtn {
+  flex: 1 1 auto;
+  padding: 8px 12px;
+  border-radius: calc(var(--ev-radius) - 4px);
+  border: 1px solid var(--ev-border);
+  background: var(--ev-card);
+  color: var(--ev-fg);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.confidenceBtn:hover {
+  border-color: var(--ev-primary);
+}
+
+.doActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.nodePick {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+}
+
+.cell.nodePick {
+  width: 100%;
+}
+
+.nodePick:hover {
+  border-color: var(--ev-accent) !important;
+}
+
+.nodePick:focus-visible {
+  outline: 2px solid var(--ev-primary);
+  outline-offset: 2px;
+}
+
+.initialRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.initialError {
+  margin: 6px 0 0;
+  color: var(--ev-destructive);
+  font-size: 0.8rem;
+}
+
+.initialHint {
+  margin: 6px 0 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.selfExplain {
+  margin: 16px;
+  padding: 16px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius);
+  background: var(--ev-card);
+}
+
+.selfExplainKicker {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ev-muted-fg);
+}
+
+.selfExplainQ {
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+
+.selfExplainInput {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px 10px;
+  border-radius: calc(var(--ev-radius) - 4px);
+  border: 1px solid var(--ev-border);
+  background: var(--ev-bg);
+  color: var(--ev-fg);
+  font: inherit;
+}
+
+.selfExplainActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.selfExplainMine {
+  margin: 0 0 8px;
+  color: var(--ev-muted-fg);
+  line-height: 1.5;
+}
+
+.selfExplainModel {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Estágios à esquerda, troca de estrutura à direita, dica embaixo. */
+.stageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 10px 16px 8px;
+}
+
+.stageSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stageHint {
+  order: 3;
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.stageTools {
+  margin-left: auto;
+}
+
+.stageTools .tabs {
+  margin-left: 0;
+  padding: 2px;
+}
+
+.stageTools .tab,
+.stageTools .tabOn {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+}
+
+.stageProgress {
+  color: var(--ev-primary);
+}
+
+.challenge,
+.challengeDone {
+  margin: 0 16px 8px;
+  padding: 12px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-border);
+  line-height: 1.5;
+}
+
+.challengeDone {
+  border-color: var(--ev-success);
+  background: color-mix(in oklch, var(--ev-success) 12%, var(--ev-card));
+}
+
+.challengeFail {
+  margin: 0 16px 8px;
+  padding: 12px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-destructive);
+  background: color-mix(in oklch, var(--ev-destructive) 12%, var(--ev-card));
+  line-height: 1.5;
+}
+
+.challengeNext {
+  margin-left: 10px;
+}
+
+.desafioHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.desafioMeters {
+  display: flex;
+  gap: 14px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--ev-muted-fg);
+}
+
+.scriptBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  border: 1px solid var(--ev-border);
+  background: var(--ev-card);
+}
+
+.scriptCount {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ev-primary);
+  white-space: nowrap;
+}
+
+.scriptCaption {
+  color: var(--ev-fg);
+  line-height: 1.4;
+}
+
+.scriptNext {
+  margin-left: auto;
+}
+
+.sideQuiet {
+  padding: 16px;
+}
+
+.sideQuietText {
+  margin: 0;
+  color: var(--ev-muted-fg);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 /* ---------- Canvas ---------- */
 @keyframes evZoomIn {
   from {
@@ -798,6 +1157,40 @@
   color: var(--ev-muted-fg);
 }
 
+.arrowPartial {
+  margin: 0 8px 16px;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  color: var(--ev-accent);
+}
+
+.listColLinked {
+  padding-bottom: 28px;
+}
+
+.linkCol {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.linkTags {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--ev-muted-fg);
+}
+
 .nullTag,
 .empty,
 .circularNote {
@@ -880,4 +1273,111 @@
   border-color: var(--ev-destructive) !important;
   opacity: 0.4;
   transform: translateY(-16px);
+}
+
+/*
+ * Telas mais baixas (notebooks de 768px ou menos de altura útil): compacta
+ * cabeçalho, mensagens, caixas de pergunta e controles para tudo caber sem
+ * rolar. Fica no fim do arquivo para vencer as regras base acima.
+ */
+@media (min-width: 1024px) and (max-height: 860px) {
+  /* A marca já aparece na barra do site; a troca de estrutura fica na barra dos estágios. */
+  .root > .header {
+    display: none;
+  }
+
+  /* Dica do estágio na mesma linha dos botões, quando couber. */
+  .main > .stageBar {
+    gap: 4px 12px;
+    margin: 8px 16px 6px;
+  }
+
+  .main .stageHint {
+    order: 0;
+    flex: 1 1 220px;
+  }
+
+  .main > .scriptBar,
+  .main > .challenge,
+  .main > .challengeDone,
+  .main > .challengeFail {
+    margin-bottom: 6px;
+    padding: 6px 12px;
+  }
+
+  .main .selfExplainInput {
+    height: 3.2em;
+  }
+
+  .main .speed > .textMuted {
+    display: none;
+  }
+
+
+
+  .main > .message,
+  .main > .messageErr {
+    padding: 8px 24px;
+  }
+
+  .main > .stage {
+    padding: 8px 16px;
+    min-height: 72px;
+  }
+
+  .grid > .side {
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .main .selfExplainKicker {
+    display: none;
+  }
+
+  .main > .predict,
+  .main > .selfExplain {
+    margin: 8px 16px;
+    padding: 12px;
+  }
+
+  .main .predictQ,
+  .main .selfExplainQ {
+    margin-bottom: 8px;
+  }
+
+  .main .predictFoot {
+    margin-top: 8px;
+  }
+
+  .main .opt {
+    padding: 6px 10px;
+  }
+
+  .main > .controls {
+    padding: 6px 12px;
+    gap: 6px 8px;
+  }
+
+  .main > .controls .size_icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .main .speed .slider {
+    width: 64px;
+  }
+}
+
+/* Notebooks entre 1024 e 1439px: colunas laterais mais estreitas dão espaço
+   ao desenho e deixam os controles numa linha só. */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .grid {
+    grid-template-columns: 220px 1fr 330px;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1365px) {
+  .grid {
+    grid-template-columns: 200px 1fr 310px;
+  }
 }

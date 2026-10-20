@@ -11,25 +11,28 @@ npm run dev
 
 Abre em `http://localhost:5173`.
 
-Variável opcional: `VITE_API_URL` (padrão `http://localhost:3001`).
+Variável opcional: `VITE_API_URL`. Sem ela, o `npm run dev` usa `http://localhost:3001` e o build de produção chama a API na mesma origem do site.
 
 ## Rodar a API (progresso / auth)
 
 ```bash
 cd server
 npm install
+cp .env.example .env   # defina JWT_SECRET (openssl rand -hex 32)
 npx prisma db push
 npm run dev
 ```
 
-Endpoints: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /progress`, `GET /progress`, `POST /quiz-attempts`, `GET /quiz-attempts/summary`.
+O servidor não sobe sem `JWT_SECRET`; em produção o segredo precisa ter pelo menos 32 bytes. Login e registro têm limite de tentativas (429). Emails são guardados em minúsculas; para normalizar contas antigas, rode `npm run db:normalize-emails` (mostra o que mudaria) e depois `npm run db:normalize-emails -- --apply`.
 
-Sem a API, a visualização continua funcionando; progresso fica só em `localStorage`.
+Endpoints: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /progress`, `GET /progress`, `POST /quiz-attempts`, `GET /quiz-attempts/summary`, `POST /events` (lote de até 100 eventos de aprendizagem, idempotente) e `GET /events`.
+
+Sem a API, a visualização continua funcionando; o progresso fica só em `localStorage`. Com login, os eventos feitos **depois** do login são enviados ao servidor; o histórico que já estava no navegador não é enviado.
 
 ## Testes
 
 ```bash
-# motor + store (frontend)
+# motor, player, quiz, eventos e rotas (frontend)
 npm run test
 
 # API
@@ -40,14 +43,20 @@ cd server && npm test
 
 | Estrutura | Operações |
 |---|---|
-| Pilha | `push`, `pop` |
-| Lista encadeada | `insertAtHead`, `insertAtTail`, `remove` (por valor) |
+| Pilha | `push`, `pop`, `peek`, `isEmpty` (com underflow) |
+| Lista encadeada | `inserirInicio`, `inserirFim`, `inserirEm`, `removerEm`, `removerValor`, `buscar` |
+
+A lista tem três tipos, cada um com passos e código próprios: **simples**, **dupla** (com cabeça e cauda) e **circular** (só com cabeça; o último nó aponta de volta para ela). O código de cada operação é mostrado em português, JavaScript, Python, Java e C, com a linha atual destacada.
 
 ## Estrutura do código
 
-- `src/engine/` — motor de simulação (sem React)
-- `src/state/` — Zustand + playback
-- `src/components/` — UI
-- `src/persistence/` — progresso local
+- `src/engine/viva/` — motor de simulação (sem React): pilha, listas e o código das operações
+- `src/engine/code/` — interpretador de código editável (ainda não ligado à interface)
+- `src/engine/demo/` — animação da página inicial
+- `src/components/` — interface (`lab/` simulador, `viva/` canvas e player, `engagement/` quiz, `site/` layout)
+- `src/content/` — lições e banco de perguntas do quiz
+- `src/learning/` — log de eventos de aprendizagem e envio ao servidor
+- `src/persistence/` — progresso local, derivado do log de eventos
+- `src/routing/` — rotas por hash (`#/lab?s=stack`)
 - `src/api/` — client HTTP (degradação graciosa)
 - `server/` — Express + Prisma (SQLite local; troque para PostgreSQL em produção)

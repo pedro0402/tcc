@@ -1,75 +1,53 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import * as E from "../engine/viva/engine";
-import type { Node, Op } from "../engine/viva/engine";
-import { usePlayer } from "../components/viva/usePlayer";
-import { CodePanel, Controls, PredictBox } from "../components/viva/Player";
-import { ListCanvas, StackCanvas, type ListKind } from "../components/viva/Canvas";
-import { Button, Input } from "../components/viva/ui";
+import { useCallback, useEffect, useState } from "react";
+import type { Node, Op, Structure } from "../engine/viva/engine";
+import type { PredictEvent } from "../components/viva/usePlayer";
+import type { ListKind } from "../components/viva/Canvas";
+import { LabWorkspace } from "../components/lab/LabWorkspace";
 import { recordOperationComplete, recordPrediction } from "../persistence/localProgress";
 import { syncProgressToApi } from "../api/progressClient";
+import { navigate, parseHashParams } from "../routing/useHashRoute";
 import styles from "../components/viva/viva.module.css";
 
 // Tela de operações portada do EstruturaViva (src/routes/index.tsx),
 // integrada ao roteamento por hash e ao progresso do ds-visualizer.
+// O simulador em si vive em components/lab/LabWorkspace.
 
 type Tab = "lista" | "pilha";
-const IDLE = "idle";
 
 function tabFromHash(): Tab {
-  const query = window.location.hash.split("?")[1] ?? "";
-  return new URLSearchParams(query).get("s") === "stack" ? "pilha" : "lista";
+  return parseHashParams(window.location.hash).s === "stack" ? "pilha" : "lista";
 }
-
-const idleOp = (structure: E.Structure, nodes: Node[]): Op => ({
-  name: IDLE,
-  structure,
-  code: [],
-  final: nodes,
-  steps: [{ line: -1, nodes, pointers: {}, highlight: [], message: "Escolha uma operação para começar.", vars: {} }],
-});
 
 export function LabPage() {
   const [tab, setTab] = useState<Tab>(tabFromHash);
   const [kind, setKind] = useState<ListKind>("simples");
-  const [list, setList] = useState<Node[]>(() => [3, 8, 15].map(E.mk));
-  const [stack, setStack] = useState<Node[]>(() => [12, 7].map(E.mk));
-  const [val, setVal] = useState("42");
-  const [pos, setPos] = useState("1");
+  // O simulador começa vazio: o aluno monta a estrutura com as operações
+  // (ou pelo campo "Estado inicial").
+  const [list, setList] = useState<Node[]>([]);
+  const [stack, setStack] = useState<Node[]>([]);
+  const [busy, setBusy] = useState(false);
 
-  const onDone = useCallback((op: Op) => {
-    (op.structure === "linkedList" ? setList : setStack)(op.final);
-    if (op.name === IDLE) return;
-    recordOperationComplete(op.structure, op.name);
-    void syncProgressToApi(op.structure, op.name);
+  const onNodesChange = useCallback((nodes: Node[], structure: Structure) => {
+    (structure === "linkedList" ? setList : setStack)(nodes);
   }, []);
-  const onPredict = useCallback((op: Op, correct: boolean) => {
-    recordPrediction(op.structure, op.name, correct);
+  const onOpDone = useCallback((op: Op) => {
+    recordOperationComplete(op.structure, op.name, op.variant);
+    // Endpoint antigo de progresso: lista dupla/circular ganha o tipo no nome.
+    const label = op.variant && op.variant !== "simples" ? `${op.name} (${op.variant})` : op.name;
+    void syncProgressToApi(op.structure, label);
   }, []);
-  const p = usePlayer({ onDone, onPredict });
-
-  const v = () => Number.parseInt(val, 10);
-  const ps = () => Number.parseInt(pos, 10);
-  const valid = !Number.isNaN(v());
-  const posValid = !Number.isNaN(ps());
-  const cur = tab === "lista" ? list : stack;
-  const idleStep: E.Step = {
-    line: -1,
-    nodes: cur,
-    pointers: { [tab === "lista" ? "cabeca" : "topo"]: cur.length ? 0 : null },
-    highlight: [],
-    message: "Escolha uma operação para começar.",
-    vars: {},
-  };
-  const step = p.op ? p.step : idleStep;
-  const run = (op: Op) => {
-    if (!p.busy) p.start(op);
-  };
+  const onPredict = useCallback((e: PredictEvent) => {
+    recordPrediction(e.op.structure, e.op.name, e.correct, e.op.variant, {
+      concept: e.concept,
+      misconception: e.misconception,
+      confidence: e.confidence,
+    });
+  }, []);
 
   const switchTab = (t: Tab, syncHash = true) => {
-    if (p.busy) return;
+    if (busy) return;
     setTab(t);
-    p.start(idleOp(t === "lista" ? "linkedList" : "stack", t === "lista" ? list : stack));
-    if (syncHash) window.location.hash = t === "lista" ? "#/lab?s=list" : "#/lab?s=stack";
+    if (syncHash) navigate("lab", { s: t === "lista" ? "list" : "stack" });
   };
 
   // Links externos (Home, Aprender) trocam a aba via hash.
@@ -82,14 +60,20 @@ export function LabPage() {
     return () => window.removeEventListener("hashchange", onHash);
   });
 
-  const clear = () => {
-    const structure: E.Structure = tab === "lista" ? "linkedList" : "stack";
-    (tab === "lista" ? setList : setStack)([]);
-    p.start(idleOp(structure, []));
-  };
+  // Se o hash mudou com uma operação em andamento, a troca ficou para depois:
+  // ao terminar, a aba volta a refletir a URL.
+  useEffect(() => {
+    if (busy) return;
+    const t = tabFromHash();
+    if (t !== tab) setTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
+
+  const structure: Structure = tab === "lista" ? "linkedList" : "stack";
 
   return (
     <div className={styles.root}>
+      {/* Em janelas baixas este cabeçalho some (a marca já está na barra do site). */}
       <header className={styles.header}>
         <div>
           <h1 className={styles.brand}>
@@ -97,105 +81,35 @@ export function LabPage() {
           </h1>
           <p className={styles.tagline}>Veja o código e a estrutura mudarem juntos — e tente prever o próximo passo.</p>
         </div>
-        <nav className={styles.tabs} role="tablist" aria-label="Estrutura">
-          {(["lista", "pilha"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              disabled={p.busy && tab !== t}
-              onClick={() => switchTab(t)}
-              className={tab === t ? styles.tabOn : styles.tab}
-            >
-              {t === "lista" ? "Lista encadeada" : "Pilha"}
-            </button>
-          ))}
-        </nav>
       </header>
 
-      <div className={styles.grid}>
-        <aside className={styles.side} aria-label="Operações">
-          <div className={styles.fields}>
-            <label className={styles.fieldLabel}>
-              Valor
-              <Input value={val} onChange={(e) => setVal(e.target.value)} type="number" aria-invalid={!valid} />
-            </label>
-            {tab === "lista" && (
-              <label className={styles.fieldLabel}>
-                Posição
-                <Input value={pos} onChange={(e) => setPos(e.target.value)} type="number" min={0} aria-invalid={!posValid} />
-              </label>
-            )}
-          </div>
-
-          {tab === "lista" ? (
-            <>
-              <div>
-                <div className={styles.groupTitle}>Tipo</div>
-                <div className={styles.kindRow}>
-                  {(["simples", "dupla", "circular"] as ListKind[]).map((k) => (
-                    <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} onClick={() => setKind(k)} aria-pressed={kind === k}>
-                      {k}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <Group title="Inserir">
-                <Button disabled={!valid || p.busy} onClick={() => run(E.listInsertHead(list, v()))}>No início</Button>
-                <Button disabled={!valid || p.busy} onClick={() => run(E.listInsertTail(list, v()))}>No fim</Button>
-                <Button disabled={!valid || !posValid || p.busy} onClick={() => run(E.listInsertAt(list, ps(), v()))}>Na posição</Button>
-              </Group>
-              <Group title="Remover">
-                <Button variant="outline" disabled={!posValid || p.busy} onClick={() => run(E.listRemoveAt(list, ps()))}>Da posição</Button>
-                <Button variant="outline" disabled={!valid || p.busy} onClick={() => run(E.listRemoveValue(list, v()))}>Por valor</Button>
-              </Group>
-              <Group title="Percorrer">
-                <Button variant="secondary" disabled={!valid || p.busy} onClick={() => run(E.listSearch(list, v()))}>Buscar valor</Button>
-              </Group>
-            </>
-          ) : (
-            <>
-              <Group title="Operações">
-                <Button disabled={!valid || p.busy} onClick={() => run(E.stackPush(stack, v()))}>push</Button>
-                <Button variant="outline" disabled={p.busy} onClick={() => run(E.stackPop(stack))}>pop</Button>
-                <Button variant="secondary" disabled={p.busy} onClick={() => run(E.stackPeek(stack))}>peek</Button>
-                <Button variant="secondary" disabled={p.busy} onClick={() => run(E.stackIsEmpty(stack))}>isEmpty</Button>
-              </Group>
-              <p className={styles.hint}>
-                LIFO: o último a entrar é o primeiro a sair. Tente <b>pop</b> com a pilha vazia para ver o underflow.
-              </p>
-            </>
-          )}
-          <Button variant="ghost" size="sm" className={styles.clear} disabled={p.busy} onClick={clear}>
-            Esvaziar estrutura
-          </Button>
-        </aside>
-
-        <section className={styles.main} aria-label="Visualização">
-          <div className={step?.error ? styles.messageErr : styles.message} aria-live="polite">
-            {step?.message}
-          </div>
-          <div className={styles.stage}>
-            {tab === "lista" ? <ListCanvas step={step} kind={kind} /> : <StackCanvas step={step} />}
-          </div>
-          <PredictBox p={p} />
-          <Controls p={p} />
-        </section>
-
-        <aside className={styles.codeAside} aria-label="Código">
-          <CodePanel p={p} />
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function Group({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className={styles.groupTitle}>{title}</div>
-      <div className={styles.groupBody}>{children}</div>
+      <LabWorkspace
+        toolbar={
+          <nav className={styles.tabs} role="tablist" aria-label="Estrutura">
+            {(["lista", "pilha"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                disabled={busy && tab !== t}
+                onClick={() => switchTab(t)}
+                className={tab === t ? styles.tabOn : styles.tab}
+              >
+                {t === "lista" ? "Lista encadeada" : "Pilha"}
+              </button>
+            ))}
+          </nav>
+        }
+        structure={structure}
+        kind={kind}
+        onKindChange={setKind}
+        nodes={tab === "lista" ? list : stack}
+        onNodesChange={onNodesChange}
+        onOpDone={onOpDone}
+        onPredict={onPredict}
+        onBusyChange={setBusy}
+      />
     </div>
   );
 }

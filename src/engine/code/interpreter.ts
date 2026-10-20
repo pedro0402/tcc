@@ -1,3 +1,13 @@
+// EXPERIMENTAL — não está ligado à interface. Só interpreter.test.ts usa este módulo.
+// Ele roda bem os snippets de languages.ts, mas tem lacunas conhecidas que impedem
+// usá-lo como editor de código ao vivo sem antes corrigi-las:
+//   - `if (...) {` com corpo em várias linhas falha; não há else/elif;
+//   - `*`, `/` e `%` não são reconhecidos; não há short-circuit em && e ||;
+//   - código de topo que não é chamada é ignorado e o fallback roda no lugar;
+//   - cabeçalhos Java/arrow/Python tipado não são reconhecidos (roda o builtin);
+//   - comentários /* */ de várias linhas são executados; `+=` e `++` não funcionam;
+//   - escopo único entre chamadas e sem limite global de passos.
+// Antes de ligar à UI, trate estes pontos (ver o relatório de bugs, item B37).
 import { createStep } from "../steps/StepGenerator";
 import type { Step, StructureSnapshot } from "../types";
 import type { CodeLang, CodeOp } from "./languages";

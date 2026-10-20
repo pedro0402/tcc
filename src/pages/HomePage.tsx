@@ -84,7 +84,7 @@ export function HomePage() {
 
 function PreviewCard() {
   return (
-    <a className={styles.preview} href={`${hrefFor("lab")}?s=list`} aria-label="Abrir o simulador da lista encadeada">
+    <a className={styles.preview} href={hrefFor("lab", { s: "list" })} aria-label="Abrir o simulador da lista encadeada">
       <LivePreview />
     </a>
   );

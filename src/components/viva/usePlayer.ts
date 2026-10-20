@@ -1,95 +1,138 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer } from "react";
 import type { Op, Step } from "../../engine/viva/engine";
+import {
+  canAnswer,
+  canAnswerDo,
+  doStepAt,
+  initialPlayerState,
+  isBusy,
+  isCorrectAnswer,
+  needsConfidence,
+  playerReducer,
+  shouldFireDone,
+} from "./playerReducer";
+
+import type { ConceptId } from "../../engine/viva/engine";
+import type { MisconceptionId } from "../../content/misconceptions";
+import { deriveDoSteps, type DoStep } from "../../engine/viva/doStage";
+
+export interface PredictEvent {
+  op: Op;
+  /** Índice do passo que a previsão revela. */
+  stepIndex: number;
+  /** Identificador estável da pergunta, quando houver. */
+  predictId?: string;
+  concept?: ConceptId;
+  chosen: number;
+  correct: boolean;
+  /** Engano representado pela alternativa escolhida (undefined se acertou). */
+  misconception?: MisconceptionId;
+  /** Confiança declarada antes de responder (0 chute, 1 acho, 2 certeza). */
+  confidence?: 0 | 1 | 2;
+}
+
+export interface DoEvent {
+  op: Op;
+  stepIndex: number;
+  pointer: string;
+  correct: boolean;
+}
 
 interface PlayerCallbacks {
   onDone: (op: Op) => void;
-  onPredict?: (op: Op, correct: boolean) => void;
+  onPredict?: (event: PredictEvent) => void;
+  onDo?: (event: DoEvent) => void;
 }
 
 /** Player do EstruturaViva: reprodução, modo previsão e placar. */
-export function usePlayer({ onDone, onPredict }: PlayerCallbacks) {
-  const [op, setOp] = useState<Op | null>(null);
-  const [idx, setIdx] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(900);
-  const [predictMode, setPredictMode] = useState(true);
-  const [asking, setAsking] = useState<number | null>(null);
-  const [answered, setAnswered] = useState<Record<number, number>>({});
-  const [score, setScore] = useState({ ok: 0, total: 0 });
-  // Depois que a operação chega ao fim o estado já foi aplicado; voltar passos
-  // é só revisão e não deve travar os botões de operação.
-  const [finished, setFinished] = useState(false);
-  const doneRef = useRef(false);
+export function usePlayer({ onDone, onPredict, onDo }: PlayerCallbacks) {
+  const [state, dispatch] = useReducer(playerReducer, initialPlayerState);
+  const { op, idx, playing, speed, predictMode, asking, answered, score, confidenceMode, confidence, doMode, doAsking, doAnswered, exampleMode, examplePaused, exampleStops } = state;
 
-  const start = (o: Op, opts: { autoPlay?: boolean } = {}) => {
-    setOp(o);
-    setIdx(0);
-    setAnswered({});
-    setAsking(null);
-    setFinished(false);
-    doneRef.current = false;
-    setPlaying(opts.autoPlay ?? true);
-  };
+  const start = (o: Op, opts: { autoPlay?: boolean; exampleStops?: Record<number, string> } = {}) =>
+    // As perguntas do estágio Fazer são derivadas da operação no momento de iniciar.
+    dispatch({ type: "START", op: o, autoPlay: opts.autoPlay, doSteps: deriveDoSteps(o), exampleStops: opts.exampleStops });
 
-  const next = () => {
-    if (!op || asking !== null) return;
-    const n = idx + 1;
-    if (n >= op.steps.length) {
-      setPlaying(false);
-      return;
-    }
-    if (predictMode && op.steps[n].predict && answered[n] === undefined) {
-      setAsking(n);
-      setPlaying(false);
-      return;
-    }
-    setIdx(n);
+  const next = () => dispatch({ type: "NEXT" });
+
+  const answerDo = (nodeId: number | null) => {
+    if (!canAnswerDo(state) || !op || doAsking === null) return;
+    const step = doStepAt(state, doAsking);
+    dispatch({ type: "ANSWER_DO", nodeId });
+    if (step) onDo?.({ op, stepIndex: doAsking, pointer: step.pointer, correct: step.answerId === nodeId });
   };
 
   const answer = (choice: number) => {
-    if (asking === null || !op || answered[asking] !== undefined) return;
-    const correct = op.steps[asking].predict!.answer === choice;
-    setAnswered((a) => ({ ...a, [asking]: choice }));
-    setScore((s) => ({ ok: s.ok + (correct ? 1 : 0), total: s.total + 1 }));
-    onPredict?.(op, correct);
+    if (!canAnswer(state) || needsConfidence(state) || !op || asking === null) return;
+    dispatch({ type: "ANSWER", choice });
+    const predict = op.steps[asking].predict;
+    onPredict?.({
+      op,
+      stepIndex: asking,
+      predictId: predict?.id,
+      concept: predict?.concept,
+      chosen: choice,
+      correct: isCorrectAnswer(state, choice),
+      misconception: predict?.misconceptions?.[choice],
+      confidence: confidence[asking],
+    });
   };
 
-  const continueAfter = () => {
-    if (asking === null) return;
-    setIdx(asking);
-    setAsking(null);
-    setPlaying(true);
-  };
-
+  // Relógio da reprodução automática.
   useEffect(() => {
     if (!playing) return;
-    const t = window.setTimeout(next, speed);
+    const t = window.setTimeout(() => dispatch({ type: "NEXT" }), speed);
     return () => window.clearTimeout(t);
-  });
+  }, [playing, speed, idx, asking, doAsking, examplePaused, op, predictMode, doMode, exampleMode, answered, doAnswered]);
 
+  // Avisa o fim da operação uma única vez (o reducer marca `finished`).
   useEffect(() => {
-    if (op && idx === op.steps.length - 1 && !doneRef.current) {
-      doneRef.current = true;
-      setFinished(true);
-      setPlaying(false);
+    if (op && shouldFireDone(state)) {
+      dispatch({ type: "DONE" });
       onDone(op);
     }
-  }, [op, idx, onDone]);
-
-  const skip = () => {
-    if (!op) return;
-    setAsking(null);
-    setIdx(op.steps.length - 1);
-    setPlaying(false);
-  };
+  }, [op, idx, state, onDone]);
 
   const step: Step | null = op ? op.steps[idx] : null;
-  const busy = !!op && !finished;
+
   return {
-    op, idx, step, playing, setPlaying, speed, setSpeed, predictMode, setPredictMode,
-    asking, answered, answer, continueAfter, score, start, next, skip, busy,
-    prev: () => { setPlaying(false); setAsking(null); setIdx((i) => Math.max(0, i - 1)); },
-    restart: () => { setIdx(0); setAsking(null); setPlaying(false); },
+    op,
+    idx,
+    step,
+    playing,
+    setPlaying: (v: boolean) => dispatch({ type: "SET_PLAYING", playing: v }),
+    speed,
+    setSpeed: (v: number) => dispatch({ type: "SET_SPEED", speed: v }),
+    predictMode,
+    setPredictMode: (on: boolean) => dispatch({ type: "SET_PREDICT_MODE", on }),
+    confidenceMode,
+    setConfidenceMode: (on: boolean) => dispatch({ type: "SET_CONFIDENCE_MODE", on }),
+    confidence,
+    setConfidence: (level: 0 | 1 | 2) => dispatch({ type: "SET_CONFIDENCE", level }),
+    needsConfidence: needsConfidence(state),
+    doMode,
+    setDoMode: (on: boolean) => dispatch({ type: "SET_DO_MODE", on }),
+    exampleMode,
+    setExampleMode: (on: boolean) => dispatch({ type: "SET_EXAMPLE_MODE", on }),
+    examplePaused,
+    exampleNote: examplePaused !== null ? exampleStops[examplePaused] : undefined,
+    continueExample: () => dispatch({ type: "CONTINUE_EXAMPLE" }),
+    doAsking,
+    doAnswered,
+    doStep: doAsking !== null ? doStepAt(state, doAsking) : undefined,
+    answerDo,
+    continueAfterDo: () => dispatch({ type: "CONTINUE_DO" }),
+    asking,
+    answered,
+    answer,
+    continueAfter: () => dispatch({ type: "CONTINUE" }),
+    score,
+    start,
+    next,
+    skip: () => dispatch({ type: "SKIP" }),
+    busy: isBusy(state),
+    prev: () => dispatch({ type: "PREV" }),
+    restart: () => dispatch({ type: "RESTART" }),
   };
 }
 
