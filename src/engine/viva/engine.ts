@@ -242,7 +242,7 @@ export const listCode = {
     "}",
   ],
   insertAt: [
-    "inserirEm(pos, valor) {",
+    "inserirEm(pos, valor) {  // exige 0 <= pos <= tamanho()",
     "  if (pos == 0) return inserirInicio(valor)",
     "  atual = cabeca",
     "  for (i = 0; i < pos - 1; i++)",
@@ -253,7 +253,7 @@ export const listCode = {
     "}",
   ],
   removeAt: [
-    "removerEm(pos) {",
+    "removerEm(pos) {  // exige 0 <= pos < tamanho()",
     "  if (pos == 0) { cabeca = cabeca.prox; return }",
     "  anterior = cabeca",
     "  for (i = 0; i < pos - 1; i++)",

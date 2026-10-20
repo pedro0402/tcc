@@ -26,9 +26,9 @@ export const dlistCode = {
     "}",
   ],
   insertAt: [
-    "inserirEm(pos, valor) {",
+    "inserirEm(pos, valor) {  // exige 0 <= pos <= tamanho()",
     "  if (pos == 0) return inserirInicio(valor)",
-    "  if (pos == tamanho) return inserirFim(valor)",
+    "  if (pos == tamanho()) return inserirFim(valor)",
     "  atual = cabeca",
     "  for (i = 0; i < pos - 1; i++) atual = atual.prox",
     "  novo = new No(valor)",
@@ -39,7 +39,7 @@ export const dlistCode = {
     "}",
   ],
   removeAt: [
-    "removerEm(pos) {",
+    "removerEm(pos) {  // exige 0 <= pos < tamanho()",
     "  alvo = cabeca",
     "  for (i = 0; i < pos; i++) alvo = alvo.prox",
     "  if (alvo.ant != null) alvo.ant.prox = alvo.prox",
@@ -225,7 +225,7 @@ export function dInsertAt(list: Node[], pos: number, value: number): Op {
   if (pos === m) {
     const r = dInsertTail(list, value);
     return dOp("inserirEm", code, r.final, [
-      listStep({ line: 2, nodes: list, links: chain(m, "dupla"), pointers: ends(m), message: "pos == tamanho: inserção no fim.", vars: { pos: `${pos}` } }),
+      listStep({ line: 2, nodes: list, links: chain(m, "dupla"), pointers: ends(m), message: "pos == tamanho(): inserção no fim.", vars: { pos: `${pos}` } }),
       ...r.steps.slice(1).map((x) => ({ ...x, line: 2 })),
     ]);
   }

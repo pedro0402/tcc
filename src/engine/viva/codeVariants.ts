@@ -51,11 +51,11 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def push(valor):",
+      "def push(self, valor):",
       "    novo = No(valor)",
-      "    novo.prox = topo",
-      "    topo = novo",
-      "    tamanho += 1",
+      "    novo.prox = self.topo",
+      "    self.topo = novo",
+      "    self.tamanho += 1",
       "",
     ],
     [
@@ -99,12 +99,12 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def pop():",
-      "    if topo is None:",
+      "def pop(self):",
+      "    if self.topo is None:",
       '        raise Exception("Underflow")',
-      "    valor = topo.valor",
-      "    topo = topo.prox",
-      "    tamanho -= 1",
+      "    valor = self.topo.valor",
+      "    self.topo = self.topo.prox",
+      "    self.tamanho -= 1",
       "    return valor",
       "",
     ],
@@ -121,9 +121,9 @@ const BANK: Record<string, Variants> = {
     [
       "int pop() {",
       "  if (topo == NULL)",
-      '    erro("Underflow");',
+      '    { erro("Underflow"); return -1; }',
       "  int valor = topo->valor;",
-      "  topo = topo->prox;",
+      "  No* velho = topo; topo = topo->prox; free(velho);",
       "  tamanho--;",
       "  return valor;",
       "}",
@@ -147,10 +147,10 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def peek():",
-      "    if topo is None:",
+      "def peek(self):",
+      "    if self.topo is None:",
       '        raise Exception("Pilha vazia")',
-      "    return topo.valor",
+      "    return self.topo.valor",
       "",
     ],
     [
@@ -163,7 +163,7 @@ const BANK: Record<string, Variants> = {
     [
       "int peek() {",
       "  if (topo == NULL)",
-      '    erro("Pilha vazia");',
+      '    { erro("Pilha vazia"); return -1; }',
       "  return topo->valor;",
       "}",
     ]
@@ -173,7 +173,7 @@ const BANK: Record<string, Variants> = {
     stackCode.isEmpty,
     ["estaVazia():", "  devolve verdadeiro se o topo for nulo", "fim"],
     ["function isEmpty() {", "  return topo === null;", "}"],
-    ["def is_empty():", "    return topo is None", ""],
+    ["def is_empty(self):", "    return self.topo is None", ""],
     ["boolean isEmpty() {", "  return topo == null;", "}"],
     ["int isEmpty() {", "  return topo == NULL;", "}"]
   ),
@@ -196,10 +196,10 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def inserir_inicio(valor):",
+      "def inserir_inicio(self, valor):",
       "    novo = No(valor)",
-      "    novo.prox = cabeca",
-      "    cabeca = novo",
+      "    novo.prox = self.cabeca",
+      "    self.cabeca = novo",
       "",
     ],
     [
@@ -241,10 +241,10 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def inserir_fim(valor):",
+      "def inserir_fim(self, valor):",
       "    novo = No(valor)",
-      "    if cabeca is None: cabeca = novo; return",
-      "    atual = cabeca",
+      "    if self.cabeca is None: self.cabeca = novo; return",
+      "    atual = self.cabeca",
       "    while atual.prox is not None:",
       "        atual = atual.prox",
       "    atual.prox = novo",
@@ -275,7 +275,7 @@ const BANK: Record<string, Variants> = {
   inserirEm: V(
     listCode.insertAt,
     [
-      "inserirEm(pos, valor):",
+      "inserirEm(pos, valor):  (pos vai de 0 até o tamanho da lista)",
       "  se pos == 0, insere no início e retorna",
       "  começa em 'atual' na cabeça",
       "  repete pos-1 vezes",
@@ -286,7 +286,7 @@ const BANK: Record<string, Variants> = {
       "fim",
     ],
     [
-      "function inserirEm(pos, valor) {",
+      "function inserirEm(pos, valor) { // exige 0 <= pos <= tamanho()",
       "  if (pos == 0) return inserirInicio(valor);",
       "  let atual = cabeca;",
       "  for (let i = 0; i < pos - 1; i++)",
@@ -297,9 +297,9 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def inserir_em(pos, valor):",
-      "    if pos == 0: return inserir_inicio(valor)",
-      "    atual = cabeca",
+      "def inserir_em(self, pos, valor):  # exige 0 <= pos <= self.tamanho()",
+      "    if pos == 0: return self.inserir_inicio(valor)",
+      "    atual = self.cabeca",
       "    for i in range(pos - 1):",
       "        atual = atual.prox",
       "    novo = No(valor)",
@@ -308,7 +308,7 @@ const BANK: Record<string, Variants> = {
       "",
     ],
     [
-      "void inserirEm(int pos, int valor) {",
+      "void inserirEm(int pos, int valor) { // exige 0 <= pos <= tamanho()",
       "  if (pos == 0) { inserirInicio(valor); return; }",
       "  No atual = cabeca;",
       "  for (int i = 0; i < pos - 1; i++)",
@@ -319,7 +319,7 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "void inserirEm(int pos, int valor) {",
+      "void inserirEm(int pos, int valor) { // exige 0 <= pos <= tamanho()",
       "  if (pos == 0) { inserirInicio(valor); return; }",
       "  No* atual = cabeca;",
       "  for (int i = 0; i < pos - 1; i++)",
@@ -334,7 +334,7 @@ const BANK: Record<string, Variants> = {
   removerEm: V(
     listCode.removeAt,
     [
-      "removerEm(pos):",
+      "removerEm(pos):  (pos vai de 0 até o tamanho da lista menos 1)",
       "  se pos == 0, a cabeça vira o próximo e retorna",
       "  começa em 'anterior' na cabeça",
       "  repete pos-1 vezes",
@@ -344,7 +344,7 @@ const BANK: Record<string, Variants> = {
       "fim",
     ],
     [
-      "function removerEm(pos) {",
+      "function removerEm(pos) { // exige 0 <= pos < tamanho()",
       "  if (pos == 0) { cabeca = cabeca.prox; return; }",
       "  let anterior = cabeca;",
       "  for (let i = 0; i < pos - 1; i++)",
@@ -354,9 +354,9 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def remover_em(pos):",
-      "    if pos == 0: cabeca = cabeca.prox; return",
-      "    anterior = cabeca",
+      "def remover_em(self, pos):  # exige 0 <= pos < self.tamanho()",
+      "    if pos == 0: self.cabeca = self.cabeca.prox; return",
+      "    anterior = self.cabeca",
       "    for i in range(pos - 1):",
       "        anterior = anterior.prox",
       "    alvo = anterior.prox",
@@ -364,7 +364,7 @@ const BANK: Record<string, Variants> = {
       "",
     ],
     [
-      "void removerEm(int pos) {",
+      "void removerEm(int pos) { // exige 0 <= pos < tamanho()",
       "  if (pos == 0) { cabeca = cabeca.prox; return; }",
       "  No anterior = cabeca;",
       "  for (int i = 0; i < pos - 1; i++)",
@@ -374,13 +374,13 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "void removerEm(int pos) {",
-      "  if (pos == 0) { cabeca = cabeca->prox; return; }",
+      "void removerEm(int pos) { // exige 0 <= pos < tamanho()",
+      "  if (pos == 0) { No* velho = cabeca; cabeca = cabeca->prox; free(velho); return; }",
       "  No* anterior = cabeca;",
       "  for (int i = 0; i < pos - 1; i++)",
       "    anterior = anterior->prox;",
       "  No* alvo = anterior->prox;",
-      "  anterior->prox = alvo->prox;",
+      "  anterior->prox = alvo->prox; free(alvo);",
       "}",
     ]
   ),
@@ -410,10 +410,10 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def remover_valor(valor):",
-      "    if cabeca is None: return",
-      "    if cabeca.valor == valor: cabeca = cabeca.prox; return",
-      "    anterior = cabeca",
+      "def remover_valor(self, valor):",
+      "    if self.cabeca is None: return",
+      "    if self.cabeca.valor == valor: self.cabeca = self.cabeca.prox; return",
+      "    anterior = self.cabeca",
       "    while anterior.prox is not None and anterior.prox.valor != valor:",
       "        anterior = anterior.prox",
       "    if anterior.prox is None: return",
@@ -434,12 +434,12 @@ const BANK: Record<string, Variants> = {
     [
       "void removerValor(int valor) {",
       "  if (cabeca == NULL) return;",
-      "  if (cabeca->valor == valor) { cabeca = cabeca->prox; return; }",
+      "  if (cabeca->valor == valor) { No* velho = cabeca; cabeca = cabeca->prox; free(velho); return; }",
       "  No* anterior = cabeca;",
       "  while (anterior->prox != NULL && anterior->prox->valor != valor)",
       "    anterior = anterior->prox;",
       "  if (anterior->prox == NULL) return;",
-      "  anterior->prox = anterior->prox->prox;",
+      "  No* alvo = anterior->prox; anterior->prox = alvo->prox; free(alvo);",
       "}",
     ]
   ),
@@ -467,8 +467,8 @@ const BANK: Record<string, Variants> = {
       "}",
     ],
     [
-      "def buscar(valor):",
-      "    atual = cabeca; i = 0",
+      "def buscar(self, valor):",
+      "    atual = self.cabeca; i = 0",
       "    while atual is not None:",
       "        if atual.valor == valor: return i",
       "        atual = atual.prox; i += 1",
