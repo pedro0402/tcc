@@ -1,8 +1,49 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
+import { PrismaClient } from "@prisma/client";
 import { createApp } from "./createApp";
 
 const app = createApp();
+const db = new PrismaClient();
+afterAll(() => db.$disconnect());
+
+const uniq = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+async function registerAndLogin(email: string, password = "secret12") {
+  await request(app).post("/auth/register").send({ email, password });
+  const login = await request(app).post("/auth/login").send({ email, password });
+  return login.body as { accessToken: string; refreshToken: string };
+}
+
+describe("robustez do servidor", () => {
+  it("registros simultâneos do mesmo email não derrubam o processo", async () => {
+    const email = `race-${uniq()}@example.com`;
+    const results = await Promise.all(
+      [0, 1, 2].map(() => request(app).post("/auth/register").send({ email, password: "secret12" }))
+    );
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses).toEqual([201, 409, 409]);
+  });
+
+  it("token de usuário apagado recebe 401, não trava a requisição", async () => {
+    const email = `gone-${uniq()}@example.com`;
+    const { accessToken } = await registerAndLogin(email);
+    await db.user.delete({ where: { email } });
+    const res = await request(app)
+      .post("/progress")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .send({ structure: "stack", operation: "push" });
+    expect(res.status).toBe(401);
+  });
+
+  it("JSON malformado devolve 400 em JSON", async () => {
+    const res = await request(app)
+      .post("/auth/login")
+      .set("Content-Type", "application/json")
+      .send("{ruim");
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "invalid_json" });
+  });
+});
 
 describe("auth and progress API", () => {
   const email = `user-${Date.now()}@example.com`;
