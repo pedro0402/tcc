@@ -9,23 +9,30 @@ import { eventSchema, eventsBodySchema } from "./events";
 
 const prisma = new PrismaClient();
 
-type JwtPayload = { userId: string; email: string };
+type TokenType = "access" | "refresh";
+type JwtPayload = { userId: string; email: string; typ: TokenType };
 type AuthedRequest = express.Request & { user: JwtPayload };
 
-function signAccess(user: { id: string; email: string }) {
+// Em segundos: 15 minutos e 7 dias.
+const TOKEN_TTL: Record<TokenType, number> = { access: 15 * 60, refresh: 7 * 24 * 60 * 60 };
+
+function signToken(user: { id: string; email: string }, typ: TokenType) {
   return jwt.sign(
-    { userId: user.id, email: user.email } satisfies JwtPayload,
+    { userId: user.id, email: user.email, typ } satisfies JwtPayload,
     config.jwtSecret,
-    { expiresIn: "15m" }
+    { expiresIn: TOKEN_TTL[typ] }
   );
 }
 
-function signRefresh(user: { id: string; email: string }) {
-  return jwt.sign(
-    { userId: user.id, email: user.email } satisfies JwtPayload,
-    config.jwtSecret,
-    { expiresIn: "7d" }
-  );
+/** Valida assinatura, validade e o tipo do token. Tokens sem `typ` são recusados. */
+function verifyToken(token: string, typ: TokenType): JwtPayload | null {
+  try {
+    const payload = jwt.verify(token, config.jwtSecret) as Partial<JwtPayload>;
+    if (payload.typ !== typ || typeof payload.userId !== "string") return null;
+    return payload as JwtPayload;
+  } catch {
+    return null;
+  }
 }
 
 function requireAuth(
@@ -37,13 +44,11 @@ function requireAuth(
   if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "unauthorized" });
   }
-  try {
-    const payload = jwt.verify(header.slice(7), config.jwtSecret) as JwtPayload;
-    (req as AuthedRequest).user = payload;
-    next();
-  } catch {
-    return res.status(401).json({ error: "invalid_token" });
-  }
+  // Só access token autentica: um refresh token não vale como Bearer.
+  const payload = verifyToken(header.slice(7), "access");
+  if (!payload) return res.status(401).json({ error: "invalid_token" });
+  (req as AuthedRequest).user = payload;
+  next();
 }
 
 /** Express 4 não captura promises rejeitadas: encaminha o erro para o middleware final. */
@@ -108,8 +113,8 @@ export function createApp() {
       if (!ok) return res.status(401).json({ error: "invalid_credentials" });
 
       return res.json({
-        accessToken: signAccess(user),
-        refreshToken: signRefresh(user),
+        accessToken: signToken(user, "access"),
+        refreshToken: signToken(user, "refresh"),
       });
     })
   );
@@ -119,15 +124,12 @@ export function createApp() {
     asyncHandler(async (req, res) => {
       const parsed = z.object({ refreshToken: z.string() }).safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
-      let payload: JwtPayload;
-      try {
-        payload = jwt.verify(parsed.data.refreshToken, config.jwtSecret) as JwtPayload;
-      } catch {
-        return res.status(401).json({ error: "invalid_token" });
-      }
+      // Só refresh token renova: um access token vazado não se perpetua.
+      const payload = verifyToken(parsed.data.refreshToken, "refresh");
+      if (!payload) return res.status(401).json({ error: "invalid_token" });
       const user = await prisma.user.findUnique({ where: { id: payload.userId } });
       if (!user) return res.status(401).json({ error: "invalid_token" });
-      return res.json({ accessToken: signAccess(user) });
+      return res.json({ accessToken: signToken(user, "access") });
     })
   );
 

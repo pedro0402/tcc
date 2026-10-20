@@ -45,6 +45,30 @@ describe("robustez do servidor", () => {
   });
 });
 
+describe("tokens", () => {
+  let tokens: { accessToken: string; refreshToken: string };
+  beforeAll(async () => {
+    tokens = await registerAndLogin(`tok-${uniq()}@example.com`);
+  });
+
+  it("refresh token não vale como Bearer", async () => {
+    const res = await request(app).get("/events").set("Authorization", `Bearer ${tokens.refreshToken}`);
+    expect(res.status).toBe(401);
+  });
+
+  it("access token não renova sessão", async () => {
+    const res = await request(app).post("/auth/refresh").send({ refreshToken: tokens.accessToken });
+    expect(res.status).toBe(401);
+  });
+
+  it("refresh token gera um access token que autentica", async () => {
+    const res = await request(app).post("/auth/refresh").send({ refreshToken: tokens.refreshToken });
+    expect(res.status).toBe(200);
+    const ok = await request(app).get("/events").set("Authorization", `Bearer ${res.body.accessToken}`);
+    expect(ok.status).toBe(200);
+  });
+});
+
 describe("auth and progress API", () => {
   const email = `user-${Date.now()}@example.com`;
   const password = "secret12";
