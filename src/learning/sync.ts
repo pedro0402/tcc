@@ -57,17 +57,23 @@ export function createEventSync({ store, send, delayMs = 2000, batchSize = 100 }
   return { flush, start };
 }
 
-/** Lê o id do usuário de um JWT, sem validar assinatura (quem valida é o servidor). */
-export function userIdFromToken(token: string | null): string | null {
+/** Lê o payload de um JWT, sem validar assinatura (quem valida é o servidor). */
+export function jwtPayload(token: string | null): Record<string, unknown> | null {
   if (!token) return null;
   try {
     const payload = token.split(".")[1];
     if (!payload) return null;
     const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const json = atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "="));
-    const id = (JSON.parse(json) as { userId?: unknown }).userId;
-    return typeof id === "string" && id ? id : null;
+    const parsed: unknown = JSON.parse(json);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
   }
+}
+
+/** Lê o id do usuário de um JWT, sem validar assinatura (quem valida é o servidor). */
+export function userIdFromToken(token: string | null): string | null {
+  const id = jwtPayload(token)?.userId;
+  return typeof id === "string" && id ? id : null;
 }

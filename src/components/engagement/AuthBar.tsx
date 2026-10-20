@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { login, register } from "../../api/progressClient";
+import { useEffect, useState } from "react";
+import { auth, login, register } from "../../api/progressClient";
 import { handleLogin } from "../../learning/bootstrap";
 import styles from "./AuthBar.module.css";
 
@@ -7,13 +7,17 @@ export function AuthBar() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [loggedIn, setLoggedIn] = useState(() => {
-    try {
-      return Boolean(localStorage.getItem("ds-visualizer-token"));
-    } catch {
-      return false;
-    }
-  });
+  const [loggedIn, setLoggedIn] = useState(() => auth().isLoggedIn());
+
+  // A sessão pode vencer ou mudar fora deste componente.
+  useEffect(
+    () =>
+      auth().subscribe((change) => {
+        setLoggedIn(auth().isLoggedIn());
+        if (change === "expired") setMessage("Sua sessão expirou. Entre de novo para continuar sincronizando.");
+      }),
+    [],
+  );
 
   if (loggedIn) {
     return (
@@ -22,7 +26,7 @@ export function AuthBar() {
         <button
           type="button"
           onClick={() => {
-            localStorage.removeItem("ds-visualizer-token");
+            auth().logout();
             setLoggedIn(false);
             setMessage("Sessão encerrada.");
           }}
