@@ -3,8 +3,8 @@
 // uma explicação-modelo. É reflexão (metacognição), não avaliação: a resposta
 // é opcional e o texto fica só no navegador.
 //
-// A chave é o nome da operação (op.name), que é o mesmo nas três variantes de
-// lista (inserirInicio, inserirFim, etc.).
+// A chave é o nome da operação (op.name), o mesmo nas três variantes de lista.
+// Onde a variante muda a resposta, VARIANT_PROMPTS (abaixo) tem precedência.
 
 export interface SelfExplainPrompt {
   /** Pergunta curta, dirigida ao que mudou de estado. */
@@ -56,6 +56,47 @@ const PROMPTS: Record<string, SelfExplainPrompt> = {
   },
 };
 
-export function selfExplainFor(operation: string): SelfExplainPrompt | undefined {
+// Onde a lista dupla ou a circular muda a resposta (custo ou ligações), a
+// variante tem pergunta própria. Chave: "variante:operação".
+const VARIANT_PROMPTS: Record<string, SelfExplainPrompt> = {
+  "dupla:inserirInicio": {
+    question: "Por que inserir no início da lista dupla mexeu em dois ponteiros da cabeça antiga?",
+    model:
+      "O novo nó aponta para a cabeça atual e a cabeça antiga passa a apontar de volta para ele (ant). Depois a cabeça vira o novo nó. Nada é percorrido: é tempo constante.",
+  },
+  "dupla:inserirFim": {
+    question: "Por que inserir no fim da lista dupla não precisou percorrer a lista?",
+    model:
+      "A lista dupla guarda a cauda. O novo nó aponta para trás para a cauda, a cauda aponta para o novo e a cauda passa a ser ele. Tempo constante.",
+  },
+  "dupla:removerEm": {
+    question: "Por que foi preciso religar dois ponteiros para tirar o nó da lista dupla?",
+    model:
+      "Cada nó é alcançado pelos dois lados. O anterior passa a apontar para o seguinte do alvo, e o seguinte passa a apontar de volta para o anterior. Só assim o alvo some nas duas direções.",
+  },
+  "dupla:removerValor": {
+    question: "Depois de achar o valor, o que foi preciso religar?",
+    model:
+      "Ao achar o alvo, o anterior dele passa a apontar para o seguinte e o seguinte aponta de volta para o anterior. Se o laço chegasse ao fim (null) sem achar, nada mudaria.",
+  },
+  "circular:inserirInicio": {
+    question: "Por que inserir no início da lista circular precisou dar a volta na lista?",
+    model:
+      "O último nó aponta para a cabeça, então ele precisa passar a apontar para o novo nó. Sem ponteiro para o fim, achar o último exige percorrer a lista: é O(n).",
+  },
+  "circular:inserirFim": {
+    question: "Como o percurso soube que tinha chegado ao último nó da lista circular?",
+    model:
+      "Na circular ninguém aponta para null: o último é o nó cujo próximo é a cabeça. Achado, ele aponta para o novo nó, e o novo aponta para a cabeça, fechando o círculo.",
+  },
+  "circular:removerValor": {
+    question: "Como a remoção soube que o valor não estava na lista circular?",
+    model:
+      "A busca compara nó a nó e para quando volta à cabeça, pois não há null no fim. Se der a volta sem achar, devolve -1 e nada é removido; achando, remove pela posição.",
+  },
+};
+
+export function selfExplainFor(operation: string, variant?: string): SelfExplainPrompt | undefined {
+  if (variant && variant !== "simples") return VARIANT_PROMPTS[`${variant}:${operation}`] ?? PROMPTS[operation];
   return PROMPTS[operation];
 }

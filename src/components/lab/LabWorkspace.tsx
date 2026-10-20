@@ -197,7 +197,7 @@ export function LabWorkspace({
 
     // Autoexplicação só nos estágios de prática.
     const hadError = op.steps.some((s) => s.error);
-    setExplained((st === "fazer" || st === "desafio") && !hadError && selfExplainFor(op.name) ? op : null);
+    setExplained((st === "fazer" || st === "desafio") && !hadError && selfExplainFor(op.name, op.variant) ? op : null);
   }, [goal, runNextScripted]);
 
   const handlePredict = useCallback((e: PredictEvent) => {
@@ -564,7 +564,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
  * aconteceu e depois compara com a explicação-modelo. É reflexão, não avaliação.
  */
 function SelfExplainBox({ op, onSubmit }: { op: Op; onSubmit: (text: string) => void }) {
-  const prompt = selfExplainFor(op.name);
+  const prompt = selfExplainFor(op.name, op.variant);
   const [text, setText] = useState("");
   const [done, setDone] = useState(false);
   if (!prompt) return null;
