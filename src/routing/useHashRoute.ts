@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 
 // A rota "praticar" (problemas, jogos e projetos) já é reconhecida aqui, mas ainda
 // não tem página nem item no menu: entra junto com a primeira atividade da área.
-export type Route = "home" | "lab" | "praticar" | "aprender" | "progresso" | "conta";
+// Enquanto isso, o App mostra um aviso de "em breve" para ela.
+// "naoencontrada" não é um endereço: é o que parseHash devolve para rotas desconhecidas.
+export type Route = "home" | "lab" | "praticar" | "aprender" | "progresso" | "conta" | "naoencontrada";
 export type RouteParams = Record<string, string>;
 
 const ROUTES: Route[] = ["home", "lab", "praticar", "aprender", "progresso", "conta"];
@@ -18,7 +20,7 @@ function split(hash: string): { path: string; query: string } {
 export function parseHash(hash: string): Route {
   const { path } = split(hash);
   if (path === "") return "home";
-  return ROUTES.includes(path as Route) ? (path as Route) : "home";
+  return ROUTES.includes(path as Route) ? (path as Route) : "naoencontrada";
 }
 
 /** Parâmetros da query do hash. Repetidos ficam com o primeiro valor. */

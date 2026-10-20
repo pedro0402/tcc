@@ -12,10 +12,10 @@ describe("parseHash", () => {
     expect(parseHash("#/praticar?t=problemas&id=desfazer")).toBe("praticar");
   });
 
-  it("aceita barra no fim e cai em home quando a rota não existe", () => {
+  it("aceita barra no fim e avisa quando a rota não existe", () => {
     expect(parseHash("#/lab/")).toBe("lab");
-    expect(parseHash("#/nao-existe")).toBe("home");
-    expect(parseHash("#/lab/outra")).toBe("home");
+    expect(parseHash("#/nao-existe")).toBe("naoencontrada");
+    expect(parseHash("#/lab/outra")).toBe("naoencontrada");
   });
 });
 
