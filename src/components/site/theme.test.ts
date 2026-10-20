@@ -62,3 +62,15 @@ describe("tema", () => {
     expect(() => saveTheme(null, "light")).not.toThrow();
   });
 });
+
+describe("script de tema do index.html", () => {
+  it("usa as mesmas chaves e o mesmo padrão de theme.ts", async () => {
+    const { DEFAULT_THEME } = await import("./theme");
+    const html = (await import("../../../index.html?raw")).default;
+    expect(html).toContain(`"${THEME_KEY}"`);
+    expect(html).toContain(`"${OLD_THEME_KEY}"`);
+    expect(html).toContain(`var theme = "${DEFAULT_THEME}"`);
+    // Precisa vir antes do bundle para valer no primeiro desenho.
+    expect(html.indexOf("dataset.theme")).toBeLessThan(html.indexOf("/src/main.tsx"));
+  });
+});

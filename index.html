@@ -8,6 +8,20 @@
       content="EstruturaViva — visualize pilhas e listas encadeadas passo a passo, com código sincronizado, previsões e quizzes."
     />
     <title>EstruturaViva — estruturas de dados passo a passo</title>
+    <!--
+      Aplica o tema salvo antes do primeiro desenho, para não piscar o tema claro
+      enquanto o React carrega. Mesmas chaves e padrão de src/components/site/theme.ts.
+    -->
+    <script>
+      (function () {
+        var theme = "dark";
+        try {
+          var saved = localStorage.getItem("estruturaviva-theme") || localStorage.getItem("structuralab-theme");
+          if (saved === "light" || saved === "dark") theme = saved;
+        } catch (e) {}
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

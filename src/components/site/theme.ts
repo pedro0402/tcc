@@ -4,6 +4,8 @@
 export type Theme = "light" | "dark";
 export const THEME_KEY = "estruturaviva-theme";
 export const OLD_THEME_KEY = "structuralab-theme";
+// O script inline do index.html repete as chaves e o padrão para aplicar o tema
+// antes do React montar (sem piscar). Mudou aqui, mude lá também.
 export const DEFAULT_THEME: Theme = "dark";
 
 type ThemeStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
