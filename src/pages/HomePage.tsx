@@ -1,5 +1,6 @@
 import { LivePreview } from "../components/home/LivePreview";
-import { hrefFor } from "../routing/useHashRoute";
+import { labHref } from "../routing/labParams";
+import { hrefFor, type Route } from "../routing/useHashRoute";
 import styles from "./HomePage.module.css";
 
 const STEPS = [
@@ -20,6 +21,13 @@ const STEPS = [
   },
 ];
 
+// Áreas do site que antes ficavam no menu do topo.
+const AREAS: Array<{ route: Route; title: string }> = [
+  { route: "aprender", title: "Lições e quiz" },
+  { route: "progresso", title: "Seu progresso" },
+  { route: "conta", title: "Conta" },
+];
+
 export function HomePage() {
   return (
     <div className={styles.page}>
@@ -34,14 +42,20 @@ export function HomePage() {
             código acompanha cada operação.
           </p>
           <div className={styles.actions}>
-            <a className={styles.cta} href={hrefFor("lab")}>
+            <a className={styles.cta} href={hrefFor("estruturas")}>
               <svg className={styles.playIcon} viewBox="0 0 24 24" aria-hidden="true">
                 <polygon points="6 3 20 12 6 21 6 3" />
               </svg>
               Começar a aprender
             </a>
-            {/* <span className={styles.actionNote}>Gratuito e direto no navegador</span> */}
           </div>
+          <nav className={styles.areas} aria-label="Outras áreas">
+            {AREAS.map((a) => (
+              <a key={a.route} className={styles.area} href={hrefFor(a.route)}>
+                {a.title}
+              </a>
+            ))}
+          </nav>
         </div>
 
         <PreviewCard />
@@ -68,23 +82,13 @@ export function HomePage() {
         ))}
       </section>
 
-      <section className={styles.closer}>
-        <div>
-          <p className={styles.closerKicker}>Lista encadeada · Pilha</p>
-          <h2 className={styles.closerTitle}>Pronto para ver a teoria ganhar vida?</h2>
-        </div>
-        <a className={styles.closerLink} href={hrefFor("lab")}>
-          Explorar estruturas
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-        </a>
-      </section>
     </div>
   );
 }
 
 function PreviewCard() {
   return (
-    <a className={styles.preview} href={hrefFor("lab", { s: "list" })} aria-label="Abrir o simulador da lista encadeada">
+    <a className={styles.preview} href={labHref("linkedList")} aria-label="Abrir o simulador da lista encadeada">
       <LivePreview />
     </a>
   );

@@ -5,12 +5,15 @@ import { LabPage } from "./pages/LabPage";
 import { LearnPage } from "./pages/LearnPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProgressPage } from "./pages/ProgressPage";
+import { StructuresPage } from "./pages/StructuresPage";
 import { useHashRoute, type Route } from "./routing/useHashRoute";
 
 function pageFor(route: Route) {
   switch (route) {
     case "home":
       return <HomePage />;
+    case "estruturas":
+      return <StructuresPage />;
     case "lab":
       return <LabPage />;
     case "aprender":

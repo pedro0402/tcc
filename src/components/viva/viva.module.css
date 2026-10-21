@@ -67,66 +67,6 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 
-/* ---------- Header ---------- */
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 24px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--ev-border);
-}
-
-.brand {
-  margin: 0;
-  font-size: 1.25rem;
-  line-height: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-
-.brandAccent {
-  color: var(--ev-accent);
-}
-
-.tagline {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--ev-muted-fg);
-}
-
-.tabs {
-  margin-left: auto;
-  display: flex;
-  border: 1px solid var(--ev-border);
-  border-radius: var(--ev-radius);
-  padding: 4px;
-}
-
-.tab,
-.tabOn {
-  border-radius: calc(var(--ev-radius) - 2px);
-  padding: 6px 16px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  background: transparent;
-  color: var(--ev-muted-fg);
-}
-
-.tab:hover {
-  color: var(--ev-fg);
-}
-
-.tabOn {
-  background: var(--ev-primary);
-  color: var(--ev-primary-fg);
-}
-
-.tab:disabled,
-.tabOn:disabled {
-  cursor: not-allowed;
-}
-
 /* ---------- Grid ---------- */
 .grid {
   flex: 1;
@@ -240,16 +180,6 @@
   gap: 8px;
 }
 
-.kindRow {
-  display: flex;
-  gap: 4px;
-}
-
-.kindRow > * {
-  flex: 1;
-  text-transform: capitalize;
-}
-
 .hint {
   margin: 0;
   font-size: 0.75rem;
@@ -336,8 +266,6 @@
 .btn:focus-visible,
 .input:focus-visible,
 .opt:focus-visible,
-.tab:focus-visible,
-.tabOn:focus-visible,
 .switch:focus-visible,
 .switchOn:focus-visible {
   outline: 2px solid var(--ev-ring);
@@ -948,16 +876,39 @@
   margin-left: auto;
 }
 
-.stageTools .tabs {
-  margin-left: 0;
-  padding: 2px;
-}
-
-.stageTools .tab,
-.stageTools .tabOn {
-  padding: 4px 12px;
+/* Estrutura em estudo e o atalho para trocar (volta à página de estruturas). */
+.structureInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--ev-border);
+  border-radius: var(--ev-radius);
   font-size: 0.8rem;
 }
+
+.structureName {
+  font-weight: 600;
+}
+
+.structureSwitch {
+  padding: 4px 10px;
+  border-radius: calc(var(--ev-radius) - 2px);
+  background: var(--ev-secondary);
+  color: var(--ev-secondary-fg);
+  font-weight: 500;
+}
+
+.structureSwitch:hover {
+  background: var(--ev-primary);
+  color: var(--ev-primary-fg);
+}
+
+.structureSwitch:focus-visible {
+  outline: 2px solid var(--ev-ring);
+  outline-offset: 2px;
+}
+
 
 .stageProgress {
   color: var(--ev-primary);
@@ -1281,11 +1232,6 @@
  * rolar. Fica no fim do arquivo para vencer as regras base acima.
  */
 @media (min-width: 1024px) and (max-height: 860px) {
-  /* A marca já aparece na barra do site; a troca de estrutura fica na barra dos estágios. */
-  .root > .header {
-    display: none;
-  }
-
   /* Dica do estágio na mesma linha dos botões, quando couber. */
   .main > .stageBar {
     gap: 4px 12px;
