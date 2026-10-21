@@ -18,7 +18,7 @@ export function NotFoundPage({ soon = false }: { soon?: boolean }) {
           : "O endereço pode estar incompleto ou ter mudado. Escolha um dos caminhos abaixo."}
       </p>
       <nav className={styles.links} aria-label="Caminhos">
-        <a href={hrefFor("lab")}>Abrir o simulador</a>
+        <a href={hrefFor("estruturas")}>Abrir o simulador</a>
         <a href={hrefFor("aprender")}>Ver as lições</a>
         <a href={hrefFor("home")}>Voltar ao início</a>
       </nav>

@@ -1,26 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Node, Op, Structure } from "../engine/viva/engine";
 import type { PredictEvent } from "../components/viva/usePlayer";
-import type { ListKind } from "../components/viva/Canvas";
 import { LabWorkspace } from "../components/lab/LabWorkspace";
 import { recordOperationComplete, recordPrediction } from "../persistence/localProgress";
 import { syncProgressToApi } from "../api/progressClient";
-import { navigate, parseHashParams } from "../routing/useHashRoute";
+import { hrefFor, parseHashParams } from "../routing/useHashRoute";
+import { labLabel, parseLabParams, type LabTarget } from "../routing/labParams";
 import styles from "../components/viva/viva.module.css";
 
 // Tela de operações portada do EstruturaViva (src/routes/index.tsx),
 // integrada ao roteamento por hash e ao progresso do ds-visualizer.
 // O simulador em si vive em components/lab/LabWorkspace.
+//
+// A estrutura e o tipo de lista vêm da URL (#/lab?s=list&k=dupla), escolhidos
+// na página de estruturas. Para trocar, o aluno volta a essa página.
 
-type Tab = "lista" | "pilha";
-
-function tabFromHash(): Tab {
-  return parseHashParams(window.location.hash).s === "stack" ? "pilha" : "lista";
-}
+const targetFromHash = (): LabTarget => parseLabParams(parseHashParams(window.location.hash));
+const sameTarget = (a: LabTarget, b: LabTarget) => a.structure === b.structure && a.kind === b.kind;
 
 export function LabPage() {
-  const [tab, setTab] = useState<Tab>(tabFromHash);
-  const [kind, setKind] = useState<ListKind>("simples");
+  const [target, setTarget] = useState<LabTarget>(targetFromHash);
   // O simulador começa vazio: o aluno monta a estrutura com as operações
   // (ou pelo campo "Estado inicial").
   const [list, setList] = useState<Node[]>([]);
@@ -44,32 +43,20 @@ export function LabPage() {
     });
   }, []);
 
-  const switchTab = (t: Tab, syncHash = true) => {
-    if (busy) return;
-    setTab(t);
-    if (syncHash) navigate("lab", { s: t === "lista" ? "list" : "stack" });
-  };
-
-  // Links externos (Home, Aprender) trocam a aba via hash.
+  // A URL pode mudar com o simulador aberto (voltar/avançar do navegador).
+  // Com uma operação em andamento a troca espera; ao terminar, a tela volta a
+  // refletir a URL.
   useEffect(() => {
-    const onHash = () => {
-      const t = tabFromHash();
-      if (t !== tab) switchTab(t, false);
+    const apply = () => {
+      const next = targetFromHash();
+      if (!busy) setTarget((cur) => (sameTarget(cur, next) ? cur : next));
     };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  });
-
-  // Se o hash mudou com uma operação em andamento, a troca ficou para depois:
-  // ao terminar, a aba volta a refletir a URL.
-  useEffect(() => {
-    if (busy) return;
-    const t = tabFromHash();
-    if (t !== tab) setTab(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
   }, [busy]);
 
-  const structure: Structure = tab === "lista" ? "linkedList" : "stack";
+  const { structure, kind } = target;
 
   return (
     <div className={styles.root}>
@@ -85,26 +72,15 @@ export function LabPage() {
 
       <LabWorkspace
         toolbar={
-          <nav className={styles.tabs} role="tablist" aria-label="Estrutura">
-            {(["lista", "pilha"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                disabled={busy && tab !== t}
-                onClick={() => switchTab(t)}
-                className={tab === t ? styles.tabOn : styles.tab}
-              >
-                {t === "lista" ? "Lista encadeada" : "Pilha"}
-              </button>
-            ))}
-          </nav>
+          <div className={styles.structureInfo}>
+            <span className={styles.structureName}>{labLabel(target)}</span>
+            {/* Sair para a escolha desmonta o simulador: pode ser feito a qualquer momento. */}
+            <a className={styles.structureSwitch} href={hrefFor("estruturas")}>Trocar estrutura</a>
+          </div>
         }
         structure={structure}
         kind={kind}
-        onKindChange={setKind}
-        nodes={tab === "lista" ? list : stack}
+        nodes={structure === "linkedList" ? list : stack}
         onNodesChange={onNodesChange}
         onOpDone={onOpDone}
         onPredict={onPredict}
