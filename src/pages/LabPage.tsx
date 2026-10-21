@@ -60,16 +60,7 @@ export function LabPage() {
 
   return (
     <div className={styles.root}>
-      {/* Em janelas baixas este cabeçalho some (a marca já está na barra do site). */}
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.brand}>
-            Estrutura<span className={styles.brandAccent}>Viva</span>
-          </h1>
-          <p className={styles.tagline}>Veja o código e a estrutura mudarem juntos — e tente prever o próximo passo.</p>
-        </div>
-      </header>
-
+      {/* Sem cabeçalho próprio: a marca já está na barra do site. */}
       <LabWorkspace
         toolbar={
           <div className={styles.structureInfo}>
