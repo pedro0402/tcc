@@ -47,7 +47,6 @@
 
 .themeToggle {
   margin-left: auto;
-  margin-right: 8px;
   width: 36px;
   height: 36px;
   display: grid;
@@ -93,38 +92,41 @@
   color: var(--amber);
 }
 
-.links {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.link,
-.active {
-  text-decoration: none;
-  padding: 7px 10px;
-  font-size: 0.82rem;
-  color: var(--muted);
-  border-radius: var(--radius);
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.link:hover {
-  color: var(--ink);
-}
-
-.active {
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-  font-weight: 600;
-}
-
 .main {
   flex: 1;
   width: min(1100px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0 56px;
   overflow: auto;
+}
+
+/* Home: sem rolagem no desktop; em telas estreitas volta a rolar. */
+.fitMain {
+  flex: 1;
+  min-height: 0;
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0;
+  overflow: auto;
+}
+
+@media (min-width: 1024px) {
+  .fitMain {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .fitMain > * {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  .fitMain {
+    padding: 16px 0;
+  }
 }
 
 .labMain {
