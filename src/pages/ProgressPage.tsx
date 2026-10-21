@@ -54,7 +54,7 @@ export function ProgressPage() {
         {recent.length === 0 ? (
           <p className={styles.empty}>
             Ainda não há execuções.{" "}
-            <a href={hrefFor("lab")}>Abra o laboratório</a> e complete um
+            <a href={hrefFor("estruturas")}>Abra o laboratório</a> e complete um
             push ou uma inserção.
           </p>
         ) : (

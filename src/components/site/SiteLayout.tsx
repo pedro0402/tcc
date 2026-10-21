@@ -4,13 +4,8 @@ import { hrefFor, type Route } from "../../routing/useHashRoute";
 import { loadTheme, safeStorage, saveTheme, type Theme } from "./theme";
 import styles from "./SiteLayout.module.css";
 
-const NAV: { route: Route; label: string }[] = [
-  { route: "lab", label: "Simulador" },
-  { route: "aprender", label: "Aprender" },
-  { route: "progresso", label: "Progresso" },
-  { route: "conta", label: "Conta" },
-];
-
+// A barra do topo só tem a marca (volta à Home) e o tema. Simulador, lições,
+// progresso e conta são acessados pela Home.
 interface SiteLayoutProps {
   route: Route;
   children: ReactNode;
@@ -18,6 +13,9 @@ interface SiteLayoutProps {
 
 export function SiteLayout({ route, children }: SiteLayoutProps) {
   const lab = route === "lab";
+  // Home e simulador ocupam a tela sem rolar (no desktop).
+  const fitted = route === "home" || route === "aprender";
+  const fixed = lab || fitted;
   const [theme, setTheme] = useState<Theme>(() => loadTheme(safeStorage()));
 
   useEffect(() => {
@@ -26,12 +24,12 @@ export function SiteLayout({ route, children }: SiteLayoutProps) {
   }, [theme]);
 
   return (
-    <div className={lab ? styles.labFrame : styles.frame}>
+    <div className={fixed ? styles.labFrame : styles.frame}>
       <a className={styles.skip} href="#conteudo">
         Pular para o conteúdo
       </a>
       <header className={styles.nav}>
-        <a className={styles.brand} href={hrefFor("home")}>
+        <a className={styles.brand} href={hrefFor("home")} aria-current={route === "home" ? "page" : undefined}>
           Estrutura<span className={styles.brandAccent}>Viva</span>
         </a>
         <button
@@ -50,20 +48,8 @@ export function SiteLayout({ route, children }: SiteLayoutProps) {
             <path d="M12 2v2M4.9 4.9l1.4 1.4M2 12h2M19.1 4.9l-1.4 1.4M20 12h2" />
           </svg>
         </button>
-        <nav aria-label="Principal" className={styles.links}>
-          {NAV.map((item) => (
-            <a
-              key={item.route}
-              href={hrefFor(item.route)}
-              className={item.route === route ? styles.active : styles.link}
-              aria-current={item.route === route ? "page" : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
       </header>
-      <main id="conteudo" className={lab ? styles.labMain : styles.main}>
+      <main id="conteudo" className={lab ? styles.labMain : fitted ? styles.fitMain : styles.main}>
         {children}
       </main>
     </div>

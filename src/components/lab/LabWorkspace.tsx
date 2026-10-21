@@ -67,7 +67,6 @@ export const idleOp = (structure: Structure, nodes: Node[], kind?: ListKind): Op
 export interface LabWorkspaceProps {
   structure: Structure;
   kind?: ListKind;
-  onKindChange?: (kind: ListKind) => void;
   nodes: Node[];
   onNodesChange: (nodes: Node[], structure: Structure) => void;
   onOpDone?: (op: Op) => void;
@@ -85,7 +84,6 @@ export interface LabWorkspaceProps {
 export function LabWorkspace({
   structure,
   kind = "simples",
-  onKindChange,
   nodes,
   onNodesChange,
   onOpDone,
@@ -381,18 +379,6 @@ export function LabWorkspace({
 
           {isList ? (
             <>
-              {onKindChange && (
-                <div>
-                  <div className={styles.groupTitle}>Tipo</div>
-                  <div className={styles.kindRow}>
-                    {(["simples", "dupla", "circular"] as ListKind[]).map((k) => (
-                      <Button key={k} size="sm" variant={kind === k ? "default" : "outline"} disabled={opsDisabled} onClick={() => onKindChange(k)} aria-pressed={kind === k}>
-                        {k}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
               {any("insertHead", "insertTail", "insertAt") && (
                 <Group title="Inserir">
                   {can("insertHead") && <Button disabled={!valid || opsDisabled} onClick={() => run(L.insertHead(nodes, v()))}>No início</Button>}

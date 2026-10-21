@@ -4,6 +4,7 @@ import { QuizPanel } from "../components/engagement/QuizPanel";
 import { ENGAGEMENT_TIPS, LIST_LESSON, STACK_LESSON } from "../content/lessons";
 import { QUIZ_SETS, quizSetById, type QuizQuestion } from "../content/quiz";
 import { recordQuizAttempt } from "../persistence/localProgress";
+import { labHref } from "../routing/labParams";
 import { hrefFor } from "../routing/useHashRoute";
 import styles from "./LearnPage.module.css";
 
@@ -21,6 +22,11 @@ export function LearnPage() {
 
   return (
     <div className={styles.page}>
+      {/*
+        No desktop é uma grade 2×2: introdução | cabeçalho do quiz em cima,
+        lições e dicas | quiz embaixo, para os blocos alinharem pelo topo e pela base.
+        Em telas estreitas tudo empilha nesta mesma ordem.
+      */}
       <header className={styles.intro}>
         <p className={styles.kicker}>Guia rápido</p>
         <h1>O que você está vendo no laboratório</h1>
@@ -31,32 +37,46 @@ export function LearnPage() {
         </p>
       </header>
 
-      <div className={styles.split}>
-        <article className={styles.lesson}>
-          <span className={styles.tag}>{STACK_LESSON.badge}</span>
-          <h2>{STACK_LESSON.title}</h2>
-          <p>{STACK_LESSON.lead}</p>
-          <ul>
-            {STACK_LESSON.points.map((p) => (
-              <li key={p}>{p}</li>
+      <div className={styles.main}>
+        <div className={styles.split}>
+          <article className={styles.lesson}>
+            <span className={styles.tag}>{STACK_LESSON.badge}</span>
+            <h2>{STACK_LESSON.title}</h2>
+            <p>{STACK_LESSON.lead}</p>
+            <ul>
+              {STACK_LESSON.points.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+            <a href={labHref("stack")}>Praticar pilha →</a>
+          </article>
+          <article className={styles.lessonAmber}>
+            <span className={styles.tagAmber}>{LIST_LESSON.badge}</span>
+            <h2>{LIST_LESSON.title}</h2>
+            <p>{LIST_LESSON.lead}</p>
+            <ul>
+              {LIST_LESSON.points.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+            <a href={hrefFor("estruturas")}>Praticar lista →</a>
+          </article>
+        </div>
+
+        <section className={styles.tips}>
+          <h2>Como estudar de verdade</h2>
+          <div className={styles.tipGrid}>
+            {ENGAGEMENT_TIPS.map((tip) => (
+              <article key={tip.title}>
+                <h3>{tip.title}</h3>
+                <p>{tip.text}</p>
+              </article>
             ))}
-          </ul>
-          <a href={hrefFor("lab", { s: "stack" })}>Praticar pilha →</a>
-        </article>
-        <article className={styles.lessonAmber}>
-          <span className={styles.tagAmber}>{LIST_LESSON.badge}</span>
-          <h2>{LIST_LESSON.title}</h2>
-          <p>{LIST_LESSON.lead}</p>
-          <ul>
-            {LIST_LESSON.points.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-          <a href={hrefFor("lab", { s: "list" })}>Praticar lista →</a>
-        </article>
+          </div>
+        </section>
       </div>
 
-      <section className={styles.quiz} aria-labelledby="quiz-title">
+      <header className={styles.quizHead}>
         <h2 id="quiz-title">Verificar entendimento</h2>
         <div className={styles.setTabs} role="group" aria-label="Estrutura do quiz">
           {QUIZ_SETS.map((s) => (
@@ -71,19 +91,10 @@ export function LearnPage() {
             </button>
           ))}
         </div>
-        <QuizPanel key={quizSet.id} set={quizSet} onAnswer={onQuizAnswer} />
-      </section>
+      </header>
 
-      <section className={styles.tips}>
-        <h2>Como estudar de verdade</h2>
-        <div className={styles.tipGrid}>
-          {ENGAGEMENT_TIPS.map((tip) => (
-            <article key={tip.title}>
-              <h3>{tip.title}</h3>
-              <p>{tip.text}</p>
-            </article>
-          ))}
-        </div>
+      <section className={styles.quiz} aria-labelledby="quiz-title">
+        <QuizPanel key={quizSet.id} set={quizSet} onAnswer={onQuizAnswer} />
       </section>
     </div>
   );

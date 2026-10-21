@@ -9,6 +9,7 @@ describe("parseHash", () => {
     expect(parseHash("#/lab")).toBe("lab");
     expect(parseHash("#/lab?s=stack")).toBe("lab");
     expect(parseHash("#/aprender")).toBe("aprender");
+    expect(parseHash("#/estruturas")).toBe("estruturas");
     expect(parseHash("#/praticar?t=problemas&id=desfazer")).toBe("praticar");
   });
 

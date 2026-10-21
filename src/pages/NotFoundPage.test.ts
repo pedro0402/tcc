@@ -7,7 +7,7 @@ describe("NotFoundPage", () => {
   it("avisa que a página não existe e oferece caminhos", () => {
     const html = renderToStaticMarkup(createElement(NotFoundPage));
     expect(html).toContain("Não achamos esta página");
-    expect(html).toContain('href="#/lab"');
+    expect(html).toContain('href="#/estruturas"');
     expect(html).toContain('href="#/"');
   });
 

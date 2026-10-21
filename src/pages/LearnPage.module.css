@@ -55,8 +55,17 @@
   padding-left: 1.1em;
 }
 
+/* Os dois cartões têm a mesma altura; o link "Praticar" vai para a base de cada um. */
+.lesson,
+.lessonAmber {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .lesson a,
 .lessonAmber a {
+  margin-top: auto;
   color: var(--accent);
   font-weight: 600;
 }
@@ -117,7 +126,12 @@
   max-width: 62ch;
 }
 
-.quiz h2 {
+.quizHead {
+  display: grid;
+  gap: 12px;
+}
+
+.quizHead h2 {
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
@@ -146,4 +160,200 @@
   background: var(--accent-soft);
   color: var(--ink);
   font-weight: 600;
+}
+
+.main {
+  display: grid;
+  gap: 28px;
+}
+
+/* O painel do quiz segue o formato dos outros cartões da página. */
+.quiz > div {
+  border-radius: var(--radius);
+}
+
+/*
+ * Sem rolagem no desktop: grade 2×2 na altura da janela.
+ *   introdução        | cabeçalho do quiz   (alinhados pela base)
+ *   lições + dicas    | painel do quiz      (mesmo topo e mesma base)
+ * O painel do quiz não define a altura da linha (contain: size): ele estica
+ * até a base das dicas e, se o conteúdo for maior, rola só por dentro.
+ * Abaixo de 1024px tudo empilha e a página volta a rolar.
+ */
+@media (min-width: 1024px) {
+  .page {
+    height: 100%;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "intro quizHead"
+      "main quiz";
+    align-content: start;
+    gap: 16px 24px;
+  }
+
+  .intro {
+    grid-area: intro;
+    align-self: end;
+  }
+
+  .main {
+    grid-area: main;
+    gap: 16px;
+  }
+
+  .quizHead {
+    grid-area: quizHead;
+    align-self: end;
+    gap: 10px;
+  }
+
+  .quiz {
+    grid-area: quiz;
+    max-width: none;
+    min-height: 0;
+    display: flex;
+    contain: size;
+    overflow-y: auto;
+  }
+
+  .quiz > div {
+    flex: 1;
+  }
+
+  .intro p {
+    margin-top: 6px;
+  }
+
+  .split {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .lesson,
+  .lessonAmber {
+    padding: 16px;
+  }
+
+  .lesson p,
+  .lessonAmber p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .lesson ul,
+  .lessonAmber ul {
+    margin: 8px 0 10px;
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .tips {
+    gap: 8px;
+  }
+
+  .tips h2 {
+    font-size: 1rem;
+  }
+
+  .tipGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .tipGrid article {
+    padding: 12px;
+  }
+
+  .tipGrid h3 {
+    margin-bottom: 4px;
+    font-size: 0.88rem;
+  }
+
+  .tipGrid p {
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+}
+
+/* Janelas baixas: menos espaço vertical em volta do conteúdo. */
+@media (min-width: 1024px) and (max-height: 760px) {
+  .page {
+    gap: 12px 24px;
+  }
+
+  .intro h1 {
+    font-size: 1.45rem;
+  }
+
+  .kicker {
+    margin-bottom: 4px;
+  }
+
+  .main {
+    gap: 12px;
+  }
+
+  .lesson h2,
+  .lessonAmber h2 {
+    margin: 4px 0;
+    font-size: 1.02rem;
+  }
+
+  .quizHead {
+    gap: 6px;
+  }
+
+  .quizHead h2 {
+    font-size: 1.02rem;
+  }
+
+  .setTabs {
+    gap: 6px;
+  }
+
+  .set,
+  .setOn {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+  }
+
+  .tips {
+    gap: 6px;
+  }
+
+  /* A frase de abertura sai; título e conteúdo continuam. */
+  .intro p {
+    display: none;
+  }
+
+  .lesson,
+  .lessonAmber {
+    padding: 10px 14px;
+  }
+
+  .lesson ul,
+  .lessonAmber ul {
+    margin: 6px 0 8px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .tipGrid article {
+    padding: 10px;
+  }
+
+  .tipGrid p {
+    font-size: 0.76rem;
+    line-height: 1.4;
+  }
+}
+
+/* Notebooks estreitos: a coluna das lições ganha espaço (menos quebra de linha). */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .page {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
 }
