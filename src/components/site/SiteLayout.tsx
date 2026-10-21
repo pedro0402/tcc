@@ -14,7 +14,7 @@ interface SiteLayoutProps {
 export function SiteLayout({ route, children }: SiteLayoutProps) {
   const lab = route === "lab";
   // Home e simulador ocupam a tela sem rolar (no desktop).
-  const fitted = route === "home";
+  const fitted = route === "home" || route === "aprender";
   const fixed = lab || fitted;
   const [theme, setTheme] = useState<Theme>(() => loadTheme(safeStorage()));
 
