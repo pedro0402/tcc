@@ -68,6 +68,12 @@
 
 * {
   box-sizing: border-box;
+  /* Oculta só a barra; a rolagem do documento e dos painéis continua ativa. */
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 html,
@@ -83,7 +89,6 @@ body {
   color: var(--ink);
   background: var(--bg);
   line-height: 1.5;
-  overflow: hidden;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
