@@ -7,16 +7,16 @@
 /* ---------- Hero ---------- */
 .hero {
   display: grid;
-  gap: 40px;
+  gap: 32px;
   align-items: center;
   padding-top: 24px;
 }
 
 @media (min-width: 900px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 48px;
-    padding-top: 48px;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+    gap: 40px;
+    padding-top: 24px;
   }
 }
 
@@ -47,19 +47,29 @@
 
 .title {
   margin: 0;
-  font-size: clamp(2.2rem, 5.2vw, 3.4rem);
-  line-height: 1.05;
+  font-family: var(--display);
+  font-size: clamp(2.25rem, 4.7vw, 3.6rem);
+  line-height: 1.08;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
+  text-wrap: balance;
 }
 
 .accent {
   color: var(--amber);
 }
 
-.lead {
+.tagline {
   margin: 20px 0 0;
+  font-family: var(--display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.lead {
+  margin: 12px 0 0;
   max-width: 46ch;
   color: var(--muted);
   font-size: 1.05rem;
@@ -103,20 +113,20 @@
   font-size: 0.85rem;
 }
 
-/* ---------- Preview (objeto interativo → card justificado) ---------- */
+/* ---------- Experimento do Hero ---------- */
 .preview {
-  display: block;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  padding: 20px;
+  padding: 24px;
   box-shadow: var(--shadow);
-  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-.preview:hover {
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
+@media (max-width: 599px) {
+  .preview {
+    padding: 16px;
+  }
 }
 
 /* ---------- Passos ---------- */

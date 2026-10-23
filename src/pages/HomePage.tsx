@@ -1,4 +1,4 @@
-import { LivePreview } from "../components/home/LivePreview";
+import { HeroPreview } from "../components/home/HeroPreview";
 import { hrefFor } from "../routing/useHashRoute";
 import styles from "./HomePage.module.css";
 
@@ -23,24 +23,24 @@ const STEPS = [
 export function HomePage() {
   return (
     <div className={styles.page}>
-      <section className={styles.hero}>
+      <section className={styles.hero} aria-labelledby="home-title">
         <div className={styles.heroText}>
           <p className={styles.kicker}>Aprender fazendo</p>
-          <h1 className={styles.title}>
+          <h1 id="home-title" className={styles.title}>
             Estruturas de dados em <span className={styles.accent}>movimento.</span>
           </h1>
+          <p className={styles.tagline}>Entenda o código. Veja acontecer.</p>
           <p className={styles.lead}>
-            Veja listas encadeadas e pilhas mudarem passo a passo enquanto o
-            código acompanha cada operação.
+            Experimente uma operação aqui. No laboratório, explore listas e
+            pilhas passo a passo.
           </p>
           <div className={styles.actions}>
             <a className={styles.cta} href={hrefFor("lab")}>
               <svg className={styles.playIcon} viewBox="0 0 24 24" aria-hidden="true">
                 <polygon points="6 3 20 12 6 21 6 3" />
               </svg>
-              Começar a aprender
+              Explorar o laboratório
             </a>
-            {/* <span className={styles.actionNote}>Gratuito e direto no navegador</span> */}
           </div>
         </div>
 
@@ -84,8 +84,8 @@ export function HomePage() {
 
 function PreviewCard() {
   return (
-    <a className={styles.preview} href={hrefFor("lab", { s: "list" })} aria-label="Abrir o simulador da lista encadeada">
-      <LivePreview />
-    </a>
+    <section className={styles.preview} aria-label="Experimente uma lista encadeada">
+      <HeroPreview />
+    </section>
   );
 }
