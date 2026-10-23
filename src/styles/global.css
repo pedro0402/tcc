@@ -15,41 +15,54 @@
   --ink: #171d1c;
   --muted: #5a6765;
   --accent: #1f5d4d;
+  --accent-contrast: #ffffff;
   --accent-soft: #dfeee9;
   --accent-strong: #153d32;
   --amber: #9d5c2a;
+  --amber-contrast: #ffffff;
   --amber-soft: #f4e7dc;
   --amber-strong: #7a441d;
   --red: #9a3b35;
   --red-soft: #f5e1e0;
+  /* O painel de código mantém contraste alto também no tema claro. */
+  --code-bg: #1b2420;
+  --code-ink: #f0f3ef;
+  --code-muted: #acbbb3;
+  --code-accent: #e5a16a;
   --shadow: 0 12px 24px rgba(23, 29, 28, 0.06);
   --radius: 6px;
   --radius-lg: 8px;
   --font: "Inter", "Segoe UI", system-ui, sans-serif;
-  --display: "Inter", "Segoe UI", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  --display: "Space Grotesk", "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #121614;
-  --bg-soft: #171c1a;
-  --panel: #191f1c;
-  --panel-strong: #212925;
-  --surface: #1e2422;
-  --surface-elevated: rgba(25, 31, 28, 0.96);
-  --line: #2c332f;
-  --line-strong: #3d453f;
-  --ink: #eef0ec;
-  --muted: #9aa4a0;
-  --accent: #5fb79c;
-  --accent-soft: rgba(95, 183, 156, 0.14);
+  --bg: #121816;
+  --bg-soft: #18201c;
+  --panel: #1b2420;
+  --panel-strong: #222d28;
+  --surface: #222d28;
+  --surface-elevated: #222d28;
+  --line: #35443d;
+  --line-strong: #52665b;
+  --ink: #f0f3ef;
+  --muted: #acbbb3;
+  --accent: #67c5a6;
+  --accent-contrast: #121816;
+  --accent-soft: rgba(103, 197, 166, 0.14);
   --accent-strong: #8fd3bc;
-  --amber: #d69054;
-  --amber-soft: rgba(214, 144, 84, 0.14);
+  --amber: #e5a16a;
+  --amber-contrast: #121816;
+  --amber-soft: rgba(229, 161, 106, 0.14);
   --amber-strong: #e8ac78;
   --red: #d98781;
   --red-soft: rgba(217, 135, 129, 0.14);
+  --code-bg: var(--bg);
+  --code-ink: var(--ink);
+  --code-muted: var(--muted);
+  --code-accent: var(--amber);
   --shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
@@ -76,8 +89,26 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
+  font-family: var(--font);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--display);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--mono);
 }
 
 a {

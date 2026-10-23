@@ -1,27 +1,28 @@
 /*
- * Tela de operações portada do EstruturaViva.
- * Tokens do tema do EstruturaViva (oklch), escopados em .root para não
- * interferir no restante do site. Tema escuro segue o toggle do SiteLayout.
+ * Os aliases --ev-* preservam os componentes do laboratório e herdam a
+ * identidade global. A alternância de tema é controlada pelo SiteLayout.
  */
 .root {
   --ev-radius: 0.375rem;
-  --ev-bg: oklch(0.975 0.012 85);
-  --ev-fg: oklch(0.22 0.03 250);
-  --ev-card: oklch(0.99 0.008 85);
-  --ev-primary: oklch(0.32 0.08 250);
-  --ev-primary-fg: oklch(0.98 0.01 85);
-  --ev-secondary: oklch(0.93 0.02 85);
-  --ev-secondary-fg: oklch(0.22 0.03 250);
-  --ev-muted-fg: oklch(0.5 0.03 250);
-  --ev-accent: oklch(0.8 0.15 70);
-  --ev-accent-fg: oklch(0.22 0.03 250);
-  --ev-destructive: oklch(0.58 0.2 27);
-  --ev-success: oklch(0.6 0.13 155);
-  --ev-code-bg: oklch(0.24 0.03 250);
-  --ev-code-fg: oklch(0.9 0.02 85);
-  --ev-border: oklch(0.86 0.02 85);
-  --ev-input: oklch(0.86 0.02 85);
-  --ev-ring: oklch(0.32 0.08 250);
+  --ev-bg: var(--bg);
+  --ev-fg: var(--ink);
+  --ev-card: var(--surface);
+  --ev-primary: var(--accent);
+  --ev-primary-fg: var(--accent-contrast);
+  --ev-secondary: var(--panel-strong);
+  --ev-secondary-fg: var(--ink);
+  --ev-muted-fg: var(--muted);
+  --ev-accent: var(--amber);
+  --ev-accent-fg: var(--amber-contrast);
+  --ev-destructive: var(--red);
+  --ev-success: var(--accent);
+  --ev-code-bg: var(--code-bg);
+  --ev-code-fg: var(--code-ink);
+  --ev-code-muted: var(--code-muted);
+  --ev-code-accent: var(--code-accent);
+  --ev-border: var(--line);
+  --ev-input: var(--line-strong);
+  --ev-ring: var(--accent);
 
   flex: 1;
   min-height: 0;
@@ -30,28 +31,8 @@
   overflow: auto;
   background: var(--ev-bg);
   color: var(--ev-fg);
-  font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font);
   line-height: 1.5;
-}
-
-:global(:root[data-theme="dark"]) .root {
-  --ev-bg: oklch(0.18 0.025 250);
-  --ev-fg: oklch(0.95 0.01 85);
-  --ev-card: oklch(0.22 0.03 250);
-  --ev-primary: oklch(0.86 0.05 250);
-  --ev-primary-fg: oklch(0.2 0.03 250);
-  --ev-secondary: oklch(0.28 0.03 250);
-  --ev-secondary-fg: oklch(0.95 0.01 85);
-  --ev-muted-fg: oklch(0.72 0.03 250);
-  --ev-accent: oklch(0.8 0.15 70);
-  --ev-accent-fg: oklch(0.2 0.03 250);
-  --ev-destructive: oklch(0.68 0.19 25);
-  --ev-success: oklch(0.72 0.14 155);
-  --ev-code-bg: oklch(0.14 0.025 250);
-  --ev-code-fg: oklch(0.9 0.02 85);
-  --ev-border: oklch(0.32 0.03 250);
-  --ev-input: oklch(0.36 0.03 250);
-  --ev-ring: oklch(0.8 0.15 70);
 }
 
 .root *,
@@ -62,9 +43,8 @@
 
 .mono,
 .monoMuted,
-.root pre,
-.root input {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+.root pre {
+  font-family: var(--mono);
 }
 
 /* ---------- Header ---------- */
@@ -227,6 +207,7 @@
 }
 
 .groupTitle {
+  font-family: var(--display);
   margin-bottom: 8px;
   font-size: 0.75rem;
   font-weight: 500;
@@ -575,11 +556,11 @@
 
 .codeHead,
 .varsHead {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  opacity: 0.6;
+  color: var(--ev-code-muted);
 }
 
 .codeHead {
@@ -603,8 +584,8 @@
   padding: 3px 8px;
   border-radius: calc(var(--ev-radius) - 4px);
   background: transparent;
-  color: color-mix(in oklch, var(--ev-code-fg) 55%, transparent);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: var(--ev-code-muted);
+  font-family: var(--mono);
   font-size: 0.68rem;
   letter-spacing: 0.02em;
   transition: background-color 0.15s, color 0.15s;
@@ -615,14 +596,14 @@
 }
 
 .langOn {
-  background: color-mix(in oklch, var(--ev-accent) 30%, transparent);
+  background: color-mix(in oklch, var(--ev-code-accent) 20%, var(--ev-code-bg));
   color: var(--ev-code-fg);
   font-weight: 600;
 }
 
 .lang:focus-visible,
 .langOn:focus-visible {
-  outline: 2px solid var(--ev-accent);
+  outline: 2px solid var(--ev-code-accent);
   outline-offset: 1px;
 }
 
@@ -654,7 +635,7 @@
 }
 
 .lineOn {
-  background: color-mix(in oklch, var(--ev-accent) 30%, transparent);
+  background: color-mix(in oklch, var(--ev-code-accent) 20%, var(--ev-code-bg));
 }
 
 .lineErr {
@@ -670,14 +651,18 @@
   width: 20px;
   flex-shrink: 0;
   text-align: right;
-  opacity: 0.4;
+  color: var(--ev-code-muted);
   user-select: none;
+}
+
+.lineErr .lineNo {
+  color: var(--ev-code-fg);
 }
 
 .vars {
   padding: 12px 16px;
   border-top: 1px solid color-mix(in oklch, var(--ev-code-fg) 10%, transparent);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 0.75rem;
 }
 
@@ -686,11 +671,11 @@
 }
 
 .varKey {
-  opacity: 0.6;
+  color: var(--ev-code-muted);
 }
 
 .varVal {
-  color: var(--ev-accent);
+  color: var(--ev-code-accent);
 }
 
 /* ---------- Previsão ---------- */
@@ -705,7 +690,6 @@
 
 .predictKicker {
   margin-bottom: 4px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -1001,7 +985,7 @@
 .desafioMeters {
   display: flex;
   gap: 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 0.85rem;
   color: var(--ev-muted-fg);
 }
@@ -1019,7 +1003,7 @@
 }
 
 .scriptCount {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--ev-primary);
@@ -1080,7 +1064,7 @@
   background: var(--ev-primary);
   color: var(--ev-primary-fg);
   padding: 0 6px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   line-height: 20px;
 }
@@ -1094,7 +1078,7 @@
   border-radius: calc(var(--ev-radius) - 2px);
   border: 2px solid var(--ev-primary) !important;
   background: var(--ev-card);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   transition: all 0.3s;
 }
 
@@ -1127,7 +1111,7 @@
   border-left: 2px solid;
   border-left-color: inherit !important;
   font-size: 0.75rem;
-  opacity: 0.5;
+  color: var(--ev-fg);
 }
 
 .listCol {
@@ -1185,7 +1169,7 @@
   margin-top: 4px;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   line-height: 12px;
   color: var(--ev-muted-fg);
@@ -1194,7 +1178,7 @@
 .nullTag,
 .empty,
 .circularNote {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   color: var(--ev-muted-fg);
 }
 
@@ -1237,7 +1221,7 @@
 .stackPtr {
   width: 48px;
   text-align: right;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 10px;
   color: var(--ev-primary);
 }
@@ -1257,7 +1241,7 @@
   border-radius: calc(var(--ev-radius) - 4px);
   border: 2px solid var(--ev-primary) !important;
   background: var(--ev-card);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--mono);
   font-size: 1.125rem;
   font-weight: 600;
   transition: all 0.3s;

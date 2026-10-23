@@ -56,12 +56,47 @@ The product is not a generic dashboard or a playful app. It is a laboratory for 
 - red: #9a3b35
 - red-soft: #f5e1e0
 
+### Dark Evergreen
+
+- background: #121816
+- background-soft: #18201c
+- panel: #1b2420
+- surface / elevated surface: #222d28
+- line: #35443d
+- line-strong: #52665b
+- text: #f0f3ef
+- text-muted: #acbbb3
+- accent: #67c5a6
+- accent-strong: #8fd3bc
+- amber: #e5a16a
+- amber-strong: #e8ac78
+- red: #d98781
+
+`src/styles/global.css` is the source of truth for both themes. Keep the
+laboratory's `--ev-*` names as semantic aliases of those global tokens in
+`src/components/viva/viva.module.css`; do not maintain a separate palette there.
+The existing `data-theme` attribute controls both the site and the laboratory.
+
+Use `--accent-contrast` and `--amber-contrast` for text on solid accent fills:
+white in the light theme and dark Evergreen in the dark theme. Text on soft
+accent surfaces uses the corresponding strong token.
+
+The code panel remains dark in both themes. Use `--code-bg`, `--code-ink`,
+`--code-muted` and `--code-accent` for its background, text, secondary text and
+technical highlights. Avoid opacity on small code labels and line numbers.
+
 ### Typography
 
-- font family: Inter, Segoe UI, sans-serif
-- monospace: IBM Plex Mono, SFMono-Regular, ui-monospace, monospace
-- headings: 600–800 weight, tight tracking for labels, balanced letter-spacing
+- body, controls, forms, navigation and explanations: `--font` (Inter, Segoe UI, system-ui, sans-serif)
+- headings, main calls to action, brand and prominent numbers: `--display` (Space Grotesk, Inter, sans-serif)
+- code, indices, variables and technical values: `--mono` (JetBrains Mono, SFMono-Regular, ui-monospace, monospace)
+- headings: 500–700 weight, balanced letter-spacing; button labels remain Inter
 - body copy: comfortable line-height, medium weight, readable contrast
+
+`index.html` loads only the weights used by the interface: Inter 400/500/600/700,
+Space Grotesk 500/600/700 and JetBrains Mono 400/600, with `display=swap` and
+system fallbacks. Native `h1`–`h6` and code elements use their global font tokens;
+non-heading title elements opt into `--display` in their CSS module.
 
 ### Space scale
 

@@ -41,6 +41,7 @@
 }
 
 .stats strong {
+  font-family: var(--display);
   font-size: 2rem;
   color: var(--accent);
 }

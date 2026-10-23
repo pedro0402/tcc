@@ -45,6 +45,6 @@
 
 .next {
   background: var(--accent);
-  color: #101216;
+  color: var(--accent-contrast);
   font-weight: 700;
 }
