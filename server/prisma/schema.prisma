@@ -2,9 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// SQLite for local MVP; switch provider to "postgresql" + DATABASE_URL for production.
+// PostgreSQL em local e produção (ex.: Neon free). URL em DATABASE_URL.
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

@@ -1,0 +1,24 @@
+# Blueprint do Render: API Express + Prisma.
+# Dashboard → New → Blueprint → conecte este repositório.
+# Depois preencha DATABASE_URL (Neon) e CORS_ORIGIN (URL da Vercel).
+services:
+  - type: web
+    name: estruturaviva-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci && npx prisma generate
+    # Free não tem Pre-Deploy Command: db push roda no start.
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

@@ -124,7 +124,7 @@ export function createApp(options: AppOptions = {}) {
 
       // Contas antigas podem ter sido gravadas com maiúsculas: compara sem caixa.
       const clash = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM User WHERE lower(email) = ${email} LIMIT 1`;
+        SELECT id FROM "User" WHERE lower(email) = ${email} LIMIT 1`;
       if (clash.length) return res.status(409).json({ error: "email_taken" });
 
       const passwordHash = await bcrypt.hash(password, 10);

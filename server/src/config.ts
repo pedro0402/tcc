@@ -30,10 +30,17 @@ function resolveJwtSecret(): string {
   return secret;
 }
 
+/** Uma origem ou várias separadas por vírgula (ex.: Vercel + localhost). */
+function resolveCorsOrigin(): string | string[] {
+  const raw = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+  const list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  return list.length <= 1 ? (list[0] ?? "http://localhost:5173") : list;
+}
+
 export const config = {
   nodeEnv: NODE_ENV,
   jwtSecret: resolveJwtSecret(),
-  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  corsOrigin: resolveCorsOrigin(),
   port: Number(process.env.PORT ?? 3001),
   // Número de proxies na frente do servidor (para req.ip correto no rate limit).
   trustProxy: Number(process.env.TRUST_PROXY ?? 0),
