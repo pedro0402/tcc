@@ -173,22 +173,20 @@
 }
 
 /*
- * Sem rolagem no desktop: grade 2×2 na altura da janela.
- *   introdução        | cabeçalho do quiz   (alinhados pela base)
- *   lições + dicas    | painel do quiz      (mesmo topo e mesma base)
- * O painel do quiz não define a altura da linha (contain: size): ele estica
- * até a base das dicas e, se o conteúdo for maior, rola só por dentro.
- * Abaixo de 1024px tudo empilha e a página volta a rolar.
+ * Desktop: grade 2×2 que cresce com o conteúdo (a página rola).
+ *   introdução        | cabeçalho do quiz
+ *   lições + dicas    | painel do quiz
+ * Abaixo de 1024px tudo empilha.
  */
 @media (min-width: 1024px) {
   .page {
-    height: 100%;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     grid-template-rows: auto auto;
     grid-template-areas:
       "intro quizHead"
       "main quiz";
     align-content: start;
+    align-items: start;
     gap: 16px 24px;
   }
 
@@ -211,14 +209,6 @@
   .quiz {
     grid-area: quiz;
     max-width: none;
-    min-height: 0;
-    display: flex;
-    contain: size;
-    overflow-y: auto;
-  }
-
-  .quiz > div {
-    flex: 1;
   }
 
   .intro p {

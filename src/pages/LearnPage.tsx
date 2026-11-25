@@ -24,8 +24,7 @@ export function LearnPage() {
     <div className={styles.page}>
       {/*
         No desktop é uma grade 2×2: introdução | cabeçalho do quiz em cima,
-        lições e dicas | quiz embaixo, para os blocos alinharem pelo topo e pela base.
-        Em telas estreitas tudo empilha nesta mesma ordem.
+        lições e dicas | quiz embaixo. Em telas estreitas tudo empilha.
       */}
       <header className={styles.intro}>
         <p className={styles.kicker}>Guia rápido</p>

@@ -100,7 +100,7 @@
   overflow: auto;
 }
 
-/* Home e Aprender: sem rolagem no desktop; em telas estreitas volta a rolar. */
+/* Home: sem rolagem no desktop; em telas estreitas volta a rolar. */
 .fitMain {
   flex: 1;
   min-height: 0;
